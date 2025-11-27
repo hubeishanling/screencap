@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:">
+    <title>ADB 截图工具</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 顶部设备选择栏 -->
+    <header class="top-bar">
+        <div class="header-content">
+            <div class="header-left">
+                <h1> ADB 截图工具</h1>
+                <div class="platform-info">
+                    <span class="platform-brand">richauto脚本免费开发平台</span>
+                    <span class="platform-divider">|</span>
+                    <a href="http://www.sanguoyr.top" class="platform-link" target="_blank">官网地址</a>
+                    <span class="platform-divider">|</span>
+                    <span class="platform-desc">支持 Java/JS 开发脚本，免费打包</span>
+                    <span class="platform-divider">|</span>
+                    <span class="platform-qq">官方交流群: 726703994</span>
+                </div>
+            </div>
+            <div class="device-selector">
+                <label for="device-select">选择设备：</label>
+                <select id="device-select" disabled>
+                    <option value="">请先刷新设备列表</option>
+                </select>
+                <button id="refresh-devices-btn" class="btn btn-small btn-primary">刷新设备</button>
+                <button id="capture-btn" class="btn btn-small btn-success" disabled>截取屏幕</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主工作区 -->
+    <div class="workspace">
+        <!-- 左侧：历史记录 -->
+        <aside class="sidebar-left">
+            <div class="section-header">
+                <h2>截图历史</h2>
+                <button id="clear-history-btn" class="btn btn-tiny btn-secondary">清空</button>
+            </div>
+            <div id="history-list" class="history-list">
+                <p class="empty-state">暂无截图记录</p>
+            </div>
+        </aside>
+
+        <!-- 中间：图片显示区域 -->
+        <main class="main-content">
+            <div class="canvas-container">
+                <div id="status-message" class="status-message"></div>
+                <!-- 操作提示和缩放控制 -->
+                <div class="bottom-controls">
+                    <div class="operation-hint">
+                        <span>💡 左键框选 | 右键拖动 | 滚轮缩放</span>
+                    </div>
+                    <div class="zoom-controls">
+                        <button id="zoom-out-btn" class="btn btn-tiny btn-secondary" title="缩小 (滚轮向下)">-</button>
+                        <span id="zoom-level">100%</span>
+                        <button id="zoom-in-btn" class="btn btn-tiny btn-secondary" title="放大 (滚轮向上)">+</button>
+                        <button id="zoom-reset-btn" class="btn btn-tiny btn-secondary" title="重置缩放">1:1</button>
+                        <button id="zoom-fit-btn" class="btn btn-tiny btn-secondary" title="适应窗口">适应</button>
+                    </div>
+                </div>
+                <div id="image-container" class="image-container">
+                    <p class="placeholder-text">请选择设备并点击"截取屏幕"开始</p>
+                    <div id="canvas-wrapper" style="position: relative; display: inline-block;">
+                        <canvas id="image-canvas" style="display: none;"></canvas>
+                        <div id="selection-overlay" style="display: none;">
+                            <div class="selection-box" id="selection-box"></div>
+                        </div>
+                        <!-- 十字光标 -->
+                        <div id="crosshair" style="display: none;">
+                            <div class="crosshair-line crosshair-h"></div>
+                            <div class="crosshair-line crosshair-v"></div>
+                            <div class="crosshair-coords" id="crosshair-coords">0, 0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧：裁剪预览和保存 -->
+        <aside class="sidebar-right">
+            <div class="section-header">
+                <h2> 裁剪预览</h2>
+            </div>
+            <div id="crop-preview-container" class="crop-preview-container">
+                <canvas id="crop-canvas" class="crop-canvas"></canvas>
+                <p class="empty-state">请在左侧图片上框选区域</p>
+            </div>
+            <div class="crop-info-panel">
+                <div id="crop-dimensions" class="crop-dimensions">
+                    <p>尺寸：<span id="crop-width">-</span> × <span id="crop-height">-</span></p>
+                    <p>位置：(<span id="crop-x">-</span>, <span id="crop-y">-</span>)</p>
+                </div>
+                <div class="action-buttons">
+                    <button id="save-crop-btn" class="btn btn-block btn-success" disabled> 保存裁剪图片</button>
+                    <button id="save-original-btn" class="btn btn-block btn-primary" disabled> 保存原图</button>
+                    <button id="reset-selection-btn" class="btn btn-block btn-secondary" disabled> 重置选区</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

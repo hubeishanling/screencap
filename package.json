@@ -1,0 +1,67 @@
+{
+  "name": "screencap-electron-app",
+  "version": "1.0.0",
+  "description": "ADB 截图工具",
+  "main": "main.js",
+  "author": "Your Name",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --inspect=5858",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --x64"
+  },
+  "keywords": [
+    "electron",
+    "desktop",
+    "app",
+    "adb",
+    "screenshot"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.screencap.app",
+    "productName": "ADB截图工具",
+    "asar": false,
+    "electronDownload": {
+      "mirror": "https://npmmirror.com/mirrors/electron/"
+    },
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*"
+    ],
+    "extraFiles": [
+      {
+        "from": "adb.exe",
+        "to": "adb.exe"
+      },
+      {
+        "from": "AdbWinApi.dll",
+        "to": "AdbWinApi.dll"
+      },
+      {
+        "from": "AdbWinUsbApi.dll",
+        "to": "AdbWinUsbApi.dll"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    }
+  }
+}

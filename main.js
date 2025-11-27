@@ -1,0 +1,338 @@
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const path = require('path');
+const { execSync, exec } = require('child_process');
+const fs = require('fs');
+const sharp = require('sharp');
+const os = require('os');
+
+// 禁用GPU硬件加速，解决Windows上的GPU进程错误
+app.disableHardwareAcceleration();
+
+// 设置单实例锁，防止多个实例同时运行
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  process.exit(0);
+}
+
+// 紧急退出处理 - 捕获所有可能的退出信号
+process.on('SIGINT', () => {
+  console.log('收到 SIGINT 信号');
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('收到 SIGTERM 信号');
+  process.exit(0);
+});
+
+// Windows 特定的退出处理
+if (process.platform === 'win32') {
+  process.on('message', (msg) => {
+    if (msg === 'graceful-exit') {
+      app.quit();
+      setTimeout(() => process.exit(0), 500);
+    }
+  });
+}
+
+let mainWindow;
+const tempDir = path.join(os.tmpdir(), 'screencap-electron');
+
+// 截图保存目录（用户文档目录下）
+const screenshotsDir = path.join(app.getPath('documents'), 'ADB_Screenshots');
+const historyFile = path.join(app.getPath('userData'), 'screenshot-history.json');
+
+// 使用项目中的 adb.exe
+// 开发环境和打包后的路径处理
+const isDev = !app.isPackaged;
+const adbPath = isDev 
+  ? path.join(__dirname, 'adb.exe')
+  : path.join(process.resourcesPath, '..', 'adb.exe');
+
+// 创建主窗口
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 800,
+    minHeight: 600,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      enableRemoteModule: false
+    },
+    frame: true,
+    backgroundColor: '#ffffff',
+    show: false
+  });
+
+  // 加载应用的 index.html
+  mainWindow.loadFile('index.html');
+
+  // 窗口准备好后显示
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
+
+  // 打开开发者工具（开发时使用）
+  // mainWindow.webContents.openDevTools();
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+// 当 Electron 完成初始化时创建窗口
+app.whenReady().then(() => {
+  // 隐藏默认菜单栏
+  Menu.setApplicationMenu(null);
+  
+  createWindow();
+
+  app.on('activate', () => {
+    // 在 macOS 上，当点击 dock 图标并且没有其他窗口打开时，
+    // 通常会重新创建一个窗口
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+// 当所有窗口都关闭时退出应用（macOS 除外）
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    // 设置超时强制退出，防止进程卡死
+    const forceQuitTimeout = setTimeout(() => {
+      process.exit(0);
+    }, 1000);
+    
+    // 尝试正常退出
+    app.quit();
+    
+    // 如果正常退出成功，清除超时
+    forceQuitTimeout.unref();
+  }
+});
+
+// 应用退出前的清理工作
+app.on('before-quit', (event) => {
+  // 立即终止所有 ADB 子进程
+  if (process.platform === 'win32') {
+    try {
+      execSync('taskkill /F /IM adb.exe /T 2>nul', { 
+        stdio: 'ignore',
+        timeout: 500
+      });
+    } catch (err) {
+      // 忽略错误
+    }
+  }
+  
+  // 快速清理临时文件（不阻塞退出）
+  try {
+    if (fs.existsSync(tempDir)) {
+      const files = fs.readdirSync(tempDir);
+      files.slice(0, 10).forEach(file => {
+        try {
+          fs.unlinkSync(path.join(tempDir, file));
+        } catch (err) {
+          // 忽略
+        }
+      });
+    }
+  } catch (err) {
+    // 忽略
+  }
+});
+
+// 强制退出处理 - 最后的保险
+app.on('will-quit', () => {
+  // 再次确保 ADB 进程被终止
+  if (process.platform === 'win32') {
+    try {
+      execSync('taskkill /F /IM adb.exe /T 2>nul', { 
+        stdio: 'ignore',
+        timeout: 300
+      });
+    } catch (err) {
+      // 忽略
+    }
+  }
+  
+  // 设置最终的强制退出
+  setTimeout(() => {
+    process.exit(0);
+  }, 500);
+});
+
+// 确保目录存在
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir, { recursive: true });
+}
+if (!fs.existsSync(screenshotsDir)) {
+  fs.mkdirSync(screenshotsDir, { recursive: true });
+}
+
+// IPC 通信示例
+ipcMain.handle('ping', async () => {
+  return 'pong';
+});
+
+ipcMain.handle('get-app-info', async () => {
+  return {
+    name: app.getName(),
+    version: app.getVersion(),
+    platform: process.platform
+  };
+});
+
+// 检查ADB设备
+ipcMain.handle('check-adb-devices', async () => {
+  try {
+    const output = execSync(`"${adbPath}" devices`, { encoding: 'utf-8' });
+    const lines = output.split('\n').filter(line => line.trim() && !line.includes('List of devices'));
+    
+    const devices = lines.map(line => {
+      const parts = line.trim().split(/\s+/);
+      return {
+        id: parts[0],
+        status: parts[1] || 'unknown'
+      };
+    }).filter(device => device.status === 'device');
+    
+    return { success: true, devices };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// ADB截图
+ipcMain.handle('capture-screen', async (event, deviceId) => {
+  try {
+    const timestamp = Date.now();
+    const devicePath = '/sdcard/screenshot.png';
+    
+    // 生成随机文件名
+    const randomId = generateRandomId(8);
+    const fileName = `screenshot_${randomId}.png`;
+    const savePath = path.join(screenshotsDir, fileName);
+    
+    // 构建ADB命令，如果有设备ID则使用 -s 参数指定设备
+    const adbPrefix = deviceId ? `"${adbPath}" -s ${deviceId}` : `"${adbPath}"`;
+    
+    // 在设备上截图
+    execSync(`${adbPrefix} shell screencap -p ${devicePath}`, { encoding: 'utf-8' });
+    
+    // 拉取到本地保存目录
+    execSync(`${adbPrefix} pull ${devicePath} "${savePath}"`, { encoding: 'utf-8' });
+    
+    // 删除设备上的截图
+    execSync(`${adbPrefix} shell rm ${devicePath}`, { encoding: 'utf-8' });
+    
+    return { 
+      success: true, 
+      imagePath: savePath,
+      fileName: fileName,
+      timestamp: new Date().toLocaleString('zh-CN')
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 生成随机ID
+function generateRandomId(length) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+// 裁剪图片
+ipcMain.handle('crop-image', async (event, imagePath, cropData) => {
+  try {
+    const { x, y, width, height } = cropData;
+    const timestamp = Date.now();
+    const outputPath = path.join(tempDir, `cropped_${timestamp}.png`);
+    
+    await sharp(imagePath)
+      .extract({ 
+        left: Math.round(x), 
+        top: Math.round(y), 
+        width: Math.round(width), 
+        height: Math.round(height) 
+      })
+      .toFile(outputPath);
+    
+    return { success: true, croppedPath: outputPath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 保存图片
+ipcMain.handle('save-image', async (event, sourcePath) => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: '保存图片',
+      defaultPath: path.join(app.getPath('pictures'), `screenshot_${Date.now()}.png`),
+      filters: [
+        { name: 'PNG图片', extensions: ['png'] },
+        { name: '所有文件', extensions: ['*'] }
+      ]
+    });
+    
+    if (!result.canceled && result.filePath) {
+      fs.copyFileSync(sourcePath, result.filePath);
+      return { success: true, savedPath: result.filePath };
+    }
+    
+    return { success: false, error: '用户取消保存' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 显示保存对话框
+ipcMain.handle('show-save-dialog', async (event, options) => {
+  return await dialog.showSaveDialog(mainWindow, options);
+});
+
+// 保存历史记录
+ipcMain.handle('save-history', async (event, historyData) => {
+  try {
+    fs.writeFileSync(historyFile, JSON.stringify(historyData, null, 2), 'utf-8');
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 加载历史记录
+ipcMain.handle('load-history', async () => {
+  try {
+    if (fs.existsSync(historyFile)) {
+      const data = fs.readFileSync(historyFile, 'utf-8');
+      const history = JSON.parse(data);
+      
+      // 验证文件是否还存在
+      const validHistory = history.filter(item => {
+        return fs.existsSync(item.path);
+      });
+      
+      return { success: true, history: validHistory };
+    }
+    return { success: true, history: [] };
+  } catch (error) {
+    return { success: false, error: error.message, history: [] };
+  }
+});
+
+// 获取截图保存目录
+ipcMain.handle('get-screenshots-dir', async () => {
+  return { success: true, path: screenshotsDir };
+});
