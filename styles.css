@@ -194,6 +194,12 @@ body {
     color: #909399;
 }
 
+.nodes-badge {
+    font-size: 0.9rem;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
 .empty-state {
     color: #909399;
     text-align: center;
@@ -350,6 +356,27 @@ body {
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
 }
 
+/* 节点高亮框 */
+#node-highlight-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.node-highlight-box {
+    position: absolute;
+    border: 3px solid #FF6B6B;
+    background: rgba(255, 107, 107, 0.15);
+    pointer-events: none;
+    box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.3),
+                0 0 10px rgba(255, 107, 107, 0.5);
+    transition: all 0.2s ease;
+}
+
 /* 十字光标 */
 #crosshair {
     position: absolute;
@@ -397,9 +424,29 @@ body {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
+/* 拖动分隔条 */
+.resizer {
+    width: 5px;
+    background: #e4e7ed;
+    cursor: col-resize;
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+    position: relative;
+}
+
+.resizer:hover {
+    background: #409EFF;
+}
+
+.resizer:active {
+    background: #3a8ee6;
+}
+
 /* 右侧边栏 - 裁剪预览 */
 .sidebar-right {
     width: 320px;
+    min-width: 250px;
+    max-width: 600px;
     background: #ffffff;
     border-left: 1px solid #e4e7ed;
     display: flex;
@@ -559,6 +606,253 @@ body {
 }
 
 .history-list::-webkit-scrollbar-thumb:hover {
+    background: #c0c4cc;
+}
+
+/* 标签页按钮 */
+.tab-buttons {
+    display: flex;
+    gap: 0;
+    width: 100%;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 12px;
+    background: #fafafa;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #606266;
+}
+
+.tab-btn:hover {
+    background: #ecf5ff;
+    color: #409EFF;
+}
+
+.tab-btn.active {
+    background: #ffffff;
+    color: #409EFF;
+    border-bottom-color: #409EFF;
+    font-weight: 600;
+}
+
+/* 面板内容 */
+.panel-content {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.panel-content.active {
+    display: flex;
+}
+
+/* 节点树容器 */
+.nodes-tree-container {
+    flex: 3;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid #e4e7ed;
+    overflow: hidden;
+}
+
+.tree-toolbar {
+    padding: 10px;
+    background: #fafafa;
+    border-bottom: 1px solid #e4e7ed;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.node-search-input {
+    flex: 1;
+    padding: 6px 12px;
+    border: 1px solid #dcdfe6;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+}
+
+.node-search-input:focus {
+    outline: none;
+    border-color: #409EFF;
+    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+.nodes-tree {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    background: #ffffff;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.85rem;
+}
+
+/* 节点树样式 */
+.tree-root {
+    user-select: none;
+}
+
+.tree-node {
+    display: block;
+}
+
+.tree-node-content {
+    display: flex;
+    align-items: center;
+    padding: 4px 0;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+.tree-node-content:hover {
+    background: #f5f7fa;
+}
+
+.tree-node.selected > .tree-node-content {
+    background: #ecf5ff;
+    color: #409EFF;
+}
+
+.tree-node.search-match > .tree-node-content {
+    background: #fff7e6;
+}
+
+.tree-indent {
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.tree-toggle {
+    display: inline-block;
+    width: 16px;
+    text-align: center;
+    font-size: 0.7rem;
+    color: #909399;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.tree-toggle.has-children:hover {
+    color: #409EFF;
+}
+
+.tree-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-left: 5px;
+}
+
+.tree-children {
+    display: none;
+}
+
+.tree-node.expanded > .tree-children {
+    display: block;
+}
+
+/* 节点详情容器 */
+.node-details-container {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.node-details-container h3 {
+    padding: 12px 15px;
+    margin: 0;
+    font-size: 0.95rem;
+    background: #fafafa;
+    border-bottom: 1px solid #e4e7ed;
+    color: #303133;
+}
+
+.node-details {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    background: #ffffff;
+}
+
+.node-details-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.detail-item {
+    display: flex;
+    padding: 8px;
+    background: #f5f7fa;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.detail-item strong {
+    color: #606266;
+    min-width: 120px;
+    flex-shrink: 0;
+}
+
+.detail-item span {
+    color: #303133;
+    word-break: break-all;
+}
+
+.detail-item code {
+    background: #e6f7ff;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    color: #0050b3;
+    font-size: 0.8rem;
+}
+
+/* 按钮新增颜色 */
+.btn-info {
+    background: #909399;
+}
+
+.btn-info:hover:not(:disabled) {
+    background: #a6a9ad;
+    box-shadow: 0 2px 8px rgba(144, 147, 153, 0.3);
+}
+
+.btn-info:active:not(:disabled) {
+    background: #82848a;
+}
+
+/* 节点树滚动条 */
+.nodes-tree::-webkit-scrollbar,
+.node-details::-webkit-scrollbar {
+    width: 6px;
+}
+
+.nodes-tree::-webkit-scrollbar-track,
+.node-details::-webkit-scrollbar-track {
+    background: #f5f7fa;
+}
+
+.nodes-tree::-webkit-scrollbar-thumb,
+.node-details::-webkit-scrollbar-thumb {
+    background: #dcdfe6;
+    border-radius: 3px;
+}
+
+.nodes-tree::-webkit-scrollbar-thumb:hover,
+.node-details::-webkit-scrollbar-thumb:hover {
     background: #c0c4cc;
 }
 

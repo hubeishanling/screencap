@@ -30,6 +30,7 @@
                 </select>
                 <button id="refresh-devices-btn" class="btn btn-small btn-primary">刷新设备</button>
                 <button id="capture-btn" class="btn btn-small btn-success" disabled>截取屏幕</button>
+                <button id="dump-ui-btn" class="btn btn-small btn-info" disabled>抓取节点</button>
             </div>
         </div>
     </header>
@@ -71,6 +72,10 @@
                         <div id="selection-overlay" style="display: none;">
                             <div class="selection-box" id="selection-box"></div>
                         </div>
+                        <!-- 节点高亮框 -->
+                        <div id="node-highlight-overlay" style="display: none;">
+                            <div class="node-highlight-box" id="node-highlight-box"></div>
+                        </div>
                         <!-- 十字光标 -->
                         <div id="crosshair" style="display: none;">
                             <div class="crosshair-line crosshair-h"></div>
@@ -82,24 +87,54 @@
             </div>
         </main>
 
-        <!-- 右侧：裁剪预览和保存 -->
-        <aside class="sidebar-right">
+        <!-- 拖动分隔条 -->
+        <div class="resizer" id="sidebar-resizer"></div>
+
+        <!-- 右侧：裁剪预览和节点信息 -->
+        <aside class="sidebar-right" id="sidebar-right">
             <div class="section-header">
-                <h2> 裁剪预览</h2>
-            </div>
-            <div id="crop-preview-container" class="crop-preview-container">
-                <canvas id="crop-canvas" class="crop-canvas"></canvas>
-                <p class="empty-state">请在左侧图片上框选区域</p>
-            </div>
-            <div class="crop-info-panel">
-                <div id="crop-dimensions" class="crop-dimensions">
-                    <p>尺寸：<span id="crop-width">-</span> × <span id="crop-height">-</span></p>
-                    <p>位置：(<span id="crop-x">-</span>, <span id="crop-y">-</span>)</p>
+                <div class="tab-buttons">
+                    <button id="crop-tab-btn" class="tab-btn active">裁剪预览</button>
+                    <button id="nodes-tab-btn" class="tab-btn">节点信息</button>
                 </div>
-                <div class="action-buttons">
-                    <button id="save-crop-btn" class="btn btn-block btn-success" disabled> 保存裁剪图片</button>
-                    <button id="save-original-btn" class="btn btn-block btn-primary" disabled> 保存原图</button>
-                    <button id="reset-selection-btn" class="btn btn-block btn-secondary" disabled> 重置选区</button>
+            </div>
+            
+            <!-- 裁剪预览面板 -->
+            <div id="crop-panel" class="panel-content active">
+                <div id="crop-preview-container" class="crop-preview-container">
+                    <canvas id="crop-canvas" class="crop-canvas"></canvas>
+                    <p class="empty-state">请在左侧图片上框选区域</p>
+                </div>
+                <div class="crop-info-panel">
+                    <div id="crop-dimensions" class="crop-dimensions">
+                        <p>尺寸：<span id="crop-width">-</span> × <span id="crop-height">-</span></p>
+                        <p>位置：(<span id="crop-x">-</span>, <span id="crop-y">-</span>)</p>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="save-crop-btn" class="btn btn-block btn-success" disabled> 保存裁剪图片</button>
+                        <button id="save-original-btn" class="btn btn-block btn-primary" disabled> 保存原图</button>
+                        <button id="reset-selection-btn" class="btn btn-block btn-secondary" disabled> 重置选区</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 节点信息面板 -->
+            <div id="nodes-panel" class="panel-content">
+                <div class="nodes-tree-container">
+                    <div class="tree-toolbar">
+                        <input type="text" id="node-search" class="node-search-input" placeholder="搜索节点 (text, resource-id, class...)">
+                        <button id="expand-all-btn" class="btn btn-tiny btn-secondary">全部展开</button>
+                        <button id="collapse-all-btn" class="btn btn-tiny btn-secondary">全部折叠</button>
+                    </div>
+                    <div id="nodes-tree" class="nodes-tree">
+                        <p class="empty-state">请点击"抓取节点"按钮获取UI层级信息</p>
+                    </div>
+                </div>
+                <div class="node-details-container">
+                    <h3>节点详情</h3>
+                    <div id="node-details" class="node-details">
+                        <p class="empty-state">请在左侧树中选择节点</p>
+                    </div>
                 </div>
             </div>
         </aside>

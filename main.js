@@ -77,7 +77,7 @@ function createWindow() {
   });
 
   // 打开开发者工具（开发时使用）
-  // mainWindow.webContents.openDevTools();
+  mainWindow.webContents.openDevTools();
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -335,4 +335,71 @@ ipcMain.handle('load-history', async () => {
 // 获取截图保存目录
 ipcMain.handle('get-screenshots-dir', async () => {
   return { success: true, path: screenshotsDir };
+});
+
+// 读取节点XML文件
+ipcMain.handle('load-ui-xml', async (event, xmlPath) => {
+  try {
+    if (!fs.existsSync(xmlPath)) {
+      return { success: false, error: '节点数据文件不存在' };
+    }
+    
+    const xmlContent = fs.readFileSync(xmlPath, 'utf-8');
+    return { 
+      success: true, 
+      xmlContent: xmlContent
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 获取UI层级结构（节点抓取）
+ipcMain.handle('dump-ui-hierarchy', async (event, deviceId) => {
+  try {
+    const timestamp = Date.now();
+    const devicePath = '/sdcard/window_dump.xml';
+    const deviceScreenPath = '/sdcard/screenshot.png';
+    
+    // 生成随机文件名
+    const randomId = generateRandomId(8);
+    const xmlFileName = `ui_dump_${randomId}.xml`;
+    const screenshotFileName = `screenshot_${randomId}.png`;
+    const xmlPath = path.join(screenshotsDir, xmlFileName);
+    const screenshotPath = path.join(screenshotsDir, screenshotFileName);
+    
+    // 构建ADB命令，如果有设备ID则使用 -s 参数指定设备
+    const adbPrefix = deviceId ? `"${adbPath}" -s ${deviceId}` : `"${adbPath}"`;
+    
+    // 同时截图和导出UI层级
+    execSync(`${adbPrefix} shell screencap -p ${deviceScreenPath}`, { encoding: 'utf-8' });
+    execSync(`${adbPrefix} shell uiautomator dump ${devicePath}`, { encoding: 'utf-8' });
+    
+    // 拉取截图和XML到本地
+    execSync(`${adbPrefix} pull ${deviceScreenPath} "${screenshotPath}"`, { encoding: 'utf-8' });
+    execSync(`${adbPrefix} pull ${devicePath} "${xmlPath}"`, { encoding: 'utf-8' });
+    
+    // 删除设备上的文件
+    try {
+      execSync(`${adbPrefix} shell rm ${deviceScreenPath}`, { encoding: 'utf-8' });
+      execSync(`${adbPrefix} shell rm ${devicePath}`, { encoding: 'utf-8' });
+    } catch (err) {
+      // 忽略删除失败
+    }
+    
+    // 读取XML文件内容
+    const xmlContent = fs.readFileSync(xmlPath, 'utf-8');
+    
+    return { 
+      success: true, 
+      xmlContent: xmlContent,
+      xmlPath: xmlPath,
+      xmlFileName: xmlFileName,
+      screenshotPath: screenshotPath,
+      screenshotFileName: screenshotFileName,
+      timestamp: new Date().toLocaleString('zh-CN')
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });

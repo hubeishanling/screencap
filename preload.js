@@ -19,5 +19,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 历史记录
   saveHistory: (historyData) => ipcRenderer.invoke('save-history', historyData),
   loadHistory: () => ipcRenderer.invoke('load-history'),
-  getScreenshotsDir: () => ipcRenderer.invoke('get-screenshots-dir')
+  getScreenshotsDir: () => ipcRenderer.invoke('get-screenshots-dir'),
+  
+  // UI节点抓取
+  dumpUIHierarchy: (deviceId) => ipcRenderer.invoke('dump-ui-hierarchy', deviceId),
+  loadUIXml: (xmlPath) => ipcRenderer.invoke('load-ui-xml', xmlPath)
 });
