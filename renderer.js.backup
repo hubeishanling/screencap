@@ -1,0 +1,1467 @@
+// 渲染进程脚本 - ADB截图工具（模块化版本）
+
+// 全局状态（简化）
+window.currentImagePath = null;
+window.currentImageData = null;
+
+// DOM元素集合
+let elements = {};
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', async () => {
+    initializeApp();
+    setupEventListeners();
+    await window.HistoryManager.loadHistoryFromDisk();
+    window.DeviceManager.refreshDevices();
+});
+
+// 初始化应用
+function initializeApp() {
+    // 缓存所有DOM元素
+    elements = {
+        // 设备相关
+        deviceSelect: document.getElementById('device-select'),
+        refreshDevicesBtn: document.getElementById('refresh-devices-btn'),
+        captureBtn: document.getElementById('capture-btn'),
+        dumpUIBtn: document.getElementById('dump-ui-btn'),
+        
+        // 历史记录
+        clearHistoryBtn: document.getElementById('clear-history-btn'),
+        historyList: document.getElementById('history-list'),
+        
+        // 状态消息
+        statusMessage: document.getElementById('status-message'),
+        
+        // 画布相关
+        imageCanvas: document.getElementById('image-canvas'),
+        imageContainer: document.getElementById('image-container'),
+        selectionOverlay: document.getElementById('selection-overlay'),
+        selectionBox: document.getElementById('selection-box'),
+        bottomControls: document.querySelector('.bottom-controls'),
+        
+        // 缩放控制
+        zoomInBtn: document.getElementById('zoom-in-btn'),
+        zoomOutBtn: document.getElementById('zoom-out-btn'),
+        zoomResetBtn: document.getElementById('zoom-reset-btn'),
+        zoomFitBtn: document.getElementById('zoom-fit-btn'),
+        zoomLevel: document.getElementById('zoom-level'),
+        
+        // 裁剪预览
+        cropCanvas: document.getElementById('crop-canvas'),
+        cropPreviewContainer: document.getElementById('crop-preview-container'),
+        cropWidth: document.getElementById('crop-width'),
+        cropHeight: document.getElementById('crop-height'),
+        cropX: document.getElementById('crop-x'),
+        cropY: document.getElementById('crop-y'),
+        saveCropBtn: document.getElementById('save-crop-btn'),
+        saveOriginalBtn: document.getElementById('save-original-btn'),
+        resetSelectionBtn: document.getElementById('reset-selection-btn'),
+        
+        // 标签页
+        cropTabBtn: document.getElementById('crop-tab-btn'),
+        nodesTabBtn: document.getElementById('nodes-tab-btn'),
+        cropPanel: document.getElementById('crop-panel'),
+        nodesPanel: document.getElementById('nodes-panel'),
+        
+        // 节点树
+        nodesTree: document.getElementById('nodes-tree'),
+        nodeDetails: document.getElementById('node-details'),
+        nodeSearch: document.getElementById('node-search'),
+        expandAllBtn: document.getElementById('expand-all-btn'),
+        collapseAllBtn: document.getElementById('collapse-all-btn'),
+        nodeHighlightOverlay: document.getElementById('node-highlight-overlay'),
+        nodeHighlightBox: document.getElementById('node-highlight-box'),
+        
+        // 侧边栏调整
+        sidebarResizer: document.getElementById('sidebar-resizer'),
+        sidebarRight: document.getElementById('sidebar-right')
+    };
+    
+    // 初始化各个模块
+    window.Utils.initStatusElement(elements.statusMessage);
+    window.DeviceManager.initElements(elements);
+    window.HistoryManager.initElements(elements);
+    window.ScreenshotManager.initElements(elements);
+    window.CanvasManager.initElements(elements);
+    window.NodeManager.initElements(elements);
+    window.UIManager.initElements(elements);
+}
+
+// 设置事件监听器
+function setupEventListeners() {
+    // 设备管理
+    elements.refreshDevicesBtn.addEventListener('click', () => window.DeviceManager.refreshDevices());
+    elements.deviceSelect.addEventListener('change', () => window.DeviceManager.onDeviceChange());
+    
+    // 截图相关
+    elements.captureBtn.addEventListener('click', () => window.ScreenshotManager.captureScreen());
+    elements.saveCropBtn.addEventListener('click', () => window.ScreenshotManager.saveCroppedImage());
+    elements.saveOriginalBtn.addEventListener('click', () => window.ScreenshotManager.saveOriginalImage());
+    
+    // 节点抓取
+    elements.dumpUIBtn.addEventListener('click', () => window.NodeManager.dumpUIHierarchy());
+    
+    // 历史记录
+    elements.clearHistoryBtn.addEventListener('click', () => window.HistoryManager.clearHistory());
+    
+    // 画布管理器事件（在CanvasManager内部设置）
+    window.CanvasManager.setupEventListeners();
+    
+    // 节点管理器事件（在NodeManager内部设置）
+    window.NodeManager.setupEventListeners();
+    
+    // UI管理器事件（在UIManager内部设置）
+    window.UIManager.setupEventListeners();
+}
+    
+    try {
+        const result = await window.electronAPI.checkAdbDevices();
+        
+        if (result.success && result.devices.length > 0) {
+            // 填充设备下拉列表
+            elements.deviceSelect.innerHTML = '<option value="">选择设备</option>';
+            result.devices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.id;
+                option.textContent = `${device.id} (${device.status})`;
+                elements.deviceSelect.appendChild(option);
+            });
+            elements.deviceSelect.disabled = false;
+            if (!silent) {
+                showStatus(`找到 ${result.devices.length} 个设备`, 'success');
+            }
+        } else {
+            elements.deviceSelect.innerHTML = '<option value="">未检测到设备</option>';
+            if (!silent) {
+                showStatus('未检测到设备，请连接Android设备并开启USB调试', 'warning');
+            }
+        }
+    } catch (error) {
+        elements.deviceSelect.innerHTML = '<option value="">检查失败</option>';
+        if (!silent) {
+            showStatus(`错误: ${error.message}`, 'error');
+        }
+    }
+}
+
+// 设备选择变化
+function onDeviceChange() {
+    selectedDevice = elements.deviceSelect.value;
+    elements.captureBtn.disabled = !selectedDevice;
+    elements.dumpUIBtn.disabled = !selectedDevice;
+}
+
+// ========== 截图功能 ==========
+
+// 截取屏幕
+async function captureScreen() {
+    if (!selectedDevice) {
+        showStatus('请先选择设备', 'warning');
+        return;
+    }
+    
+    showStatus('正在截图...', 'info');
+    elements.captureBtn.disabled = true;
+    
+    try {
+        const result = await window.electronAPI.captureScreen(selectedDevice);
+        
+        if (result.success) {
+            currentImagePath = result.imagePath;
+            await loadAndDisplayImage(currentImagePath);
+            
+            // 添加到历史记录（使用服务器返回的文件名和时间戳）
+            addToHistory(result.imagePath, result.fileName, result.timestamp);
+            
+            // 启用保存原图按钮
+            elements.saveOriginalBtn.disabled = false;
+            
+            showStatus('截图成功！使用鼠标在图片上框选需要裁剪的区域', 'success');
+        } else {
+            showStatus(`截图失败: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showStatus(` 截图失败: ${error.message}`, 'error');
+    } finally {
+        elements.captureBtn.disabled = false;
+    }
+}
+
+// 加载并显示图片
+function loadAndDisplayImage(imagePath) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            currentImageData = img;
+            
+            // 计算初始缩放比例以适应容器
+            const containerRect = elements.imageContainer.getBoundingClientRect();
+            const maxWidth = containerRect.width - 40;
+            const maxHeight = containerRect.height - 40;
+            
+            scale = Math.min(
+                maxWidth / img.width,
+                maxHeight / img.height,
+                1
+            );
+            
+            // 重置缩放级别
+            zoomLevel = 1;
+            
+            // 绘制图片
+            redrawCanvas();
+            
+            // 显示canvas和缩放控制
+            const placeholder = elements.imageContainer.querySelector('.placeholder-text');
+            if (placeholder) placeholder.style.display = 'none';
+            elements.imageCanvas.style.display = 'block';
+            elements.bottomControls.classList.add('active');
+            elements.imageContainer.classList.add('has-image');
+            
+            // 更新缩放显示
+            updateZoomDisplay();
+            
+            // 重置选区
+            resetSelection();
+            
+            // 隐藏节点高亮
+            hideNodeHighlight();
+            
+            resolve();
+        };
+        img.onerror = reject;
+        img.src = imagePath;
+    });
+}
+
+// 重绘canvas
+function redrawCanvas() {
+    if (!currentImageData) return;
+    
+    // 计算当前显示尺寸
+    const displayWidth = currentImageData.width * scale * zoomLevel;
+    const displayHeight = currentImageData.height * scale * zoomLevel;
+    
+    // 设置canvas尺寸
+    elements.imageCanvas.width = displayWidth;
+    elements.imageCanvas.height = displayHeight;
+    
+    // 绘制图片
+    const ctx = elements.imageCanvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(currentImageData, 0, 0, displayWidth, displayHeight);
+    
+    // 计算canvas在容器中的偏移
+    updateCanvasOffset();
+    
+    // 如果有选中的节点，更新高亮位置
+    if (selectedNode) {
+        highlightNodeOnImage(selectedNode);
+    }
+}
+
+// 更新canvas偏移量
+function updateCanvasOffset() {
+    const canvasRect = elements.imageCanvas.getBoundingClientRect();
+    const containerRect = elements.imageContainer.getBoundingClientRect();
+    canvasOffset.x = canvasRect.left - containerRect.left;
+    canvasOffset.y = canvasRect.top - containerRect.top;
+}
+
+// ========== 鼠标框选功能 ==========
+
+// Canvas鼠标按下
+function onCanvasMouseDown(e) {
+    if (!currentImageData) return;
+    
+    // 只有左键才开始框选
+    if (e.button !== 0) return;
+    
+    isSelecting = true;
+    const rect = elements.imageCanvas.getBoundingClientRect();
+    selectionStart.x = e.clientX - rect.left;
+    selectionStart.y = e.clientY - rect.top;
+    selectionEnd = { ...selectionStart };
+    
+    elements.selectionBox.style.display = 'none';
+    elements.selectionOverlay.style.display = 'block';
+    
+    e.preventDefault();
+}
+
+// Canvas鼠标进入
+function onCanvasMouseEnter(e) {
+    if (currentImageData && crosshair) {
+        crosshair.style.display = 'block';
+    }
+}
+
+// Canvas鼠标移动
+function onCanvasMouseMove(e) {
+    if (!currentImageData) return;
+    
+    const rect = elements.imageCanvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    // 更新十字光标位置
+    updateCrosshair(mouseX, mouseY, rect);
+    
+    // 如果正在框选，更新选区
+    if (isSelecting) {
+        selectionEnd.x = mouseX;
+        selectionEnd.y = mouseY;
+        
+        // 限制在canvas范围内
+        selectionEnd.x = Math.max(0, Math.min(selectionEnd.x, elements.imageCanvas.width));
+        selectionEnd.y = Math.max(0, Math.min(selectionEnd.y, elements.imageCanvas.height));
+        
+        updateSelectionBox();
+    }
+}
+
+// Canvas鼠标抬起
+function onCanvasMouseUp(e) {
+    if (!isSelecting) return;
+    
+    isSelecting = false;
+    
+    const width = Math.abs(selectionEnd.x - selectionStart.x);
+    const height = Math.abs(selectionEnd.y - selectionStart.y);
+    
+    // 如果选区太小（点击而非框选）
+    if (width < 10 || height < 10) {
+        resetSelection();
+        
+        // 如果有节点数据，尝试查找点击位置对应的节点
+        if (uiHierarchyData) {
+            const rect = elements.imageCanvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            
+            // 转换为原始图片坐标
+            const originalX = Math.round(clickX / (scale * zoomLevel));
+            const originalY = Math.round(clickY / (scale * zoomLevel));
+            
+            console.log('点击坐标:', { clickX, clickY, originalX, originalY, scale, zoomLevel });
+            
+            // 查找对应的节点
+            const foundNode = findNodeByCoordinates(originalX, originalY);
+            
+            if (foundNode) {
+                console.log('找到节点:', foundNode);
+                // 在树中展开并选中节点
+                expandAndSelectNodeInTree(foundNode);
+            } else {
+                console.log('未找到节点，尝试查找根节点:', uiHierarchyData);
+                showStatus(`该位置未找到对应的UI节点 (坐标: ${originalX}, ${originalY})`, 'warning');
+            }
+        }
+        
+        return;
+    }
+    
+    // 显示选区并更新裁剪预览
+    updateSelectionBox();
+    updateCropPreview();
+}
+
+// Canvas鼠标离开
+function onCanvasMouseLeave(e) {
+    // 隐藏十字光标
+    if (crosshair) {
+        crosshair.style.display = 'none';
+    }
+    
+    // 如果正在框选，停止框选
+    if (isSelecting) {
+        onCanvasMouseUp(e);
+    }
+}
+
+// 更新十字光标位置
+function updateCrosshair(mouseX, mouseY, canvasRect) {
+    if (!crosshair || !currentImageData) return;
+    
+    // 转换为原始图片坐标
+    const originalX = Math.round(mouseX / (scale * zoomLevel));
+    const originalY = Math.round(mouseY / (scale * zoomLevel));
+    
+    // 更新十字线位置（现在相对于canvas-wrapper，不需要offset）
+    crosshairH.style.top = mouseY + 'px';
+    crosshairV.style.left = mouseX + 'px';
+    
+    // 更新坐标显示
+    crosshairCoords.textContent = `${originalX}, ${originalY}`;
+    
+    // 计算坐标框的位置，避免超出边界
+    let coordX = mouseX + 15;
+    let coordY = mouseY + 15;
+    
+    // 如果坐标框会超出右边界，放到鼠标左边
+    if (coordX + 100 > elements.imageCanvas.width) {
+        coordX = mouseX - 100;
+    }
+    
+    // 如果坐标框会超出下边界，放到鼠标上边
+    if (coordY + 30 > elements.imageCanvas.height) {
+        coordY = mouseY - 35;
+    }
+    
+    crosshairCoords.style.left = coordX + 'px';
+    crosshairCoords.style.top = coordY + 'px';
+}
+
+// 更新选区框
+function updateSelectionBox() {
+    const left = Math.min(selectionStart.x, selectionEnd.x);
+    const top = Math.min(selectionStart.y, selectionEnd.y);
+    const width = Math.abs(selectionEnd.x - selectionStart.x);
+    const height = Math.abs(selectionEnd.y - selectionStart.y);
+    
+    // 现在相对于canvas-wrapper，不需要canvasOffset
+    elements.selectionBox.style.left = left + 'px';
+    elements.selectionBox.style.top = top + 'px';
+    elements.selectionBox.style.width = width + 'px';
+    elements.selectionBox.style.height = height + 'px';
+    elements.selectionBox.style.display = 'block';
+}
+
+// 更新裁剪预览
+function updateCropPreview() {
+    const left = Math.min(selectionStart.x, selectionEnd.x);
+    const top = Math.min(selectionStart.y, selectionEnd.y);
+    const width = Math.abs(selectionEnd.x - selectionStart.x);
+    const height = Math.abs(selectionEnd.y - selectionStart.y);
+    
+    // 转换为原始图片坐标
+    const originalX = Math.round(left / (scale * zoomLevel));
+    const originalY = Math.round(top / (scale * zoomLevel));
+    const originalWidth = Math.round(width / (scale * zoomLevel));
+    const originalHeight = Math.round(height / (scale * zoomLevel));
+    
+    // 更新尺寸信息
+    elements.cropWidth.textContent = originalWidth;
+    elements.cropHeight.textContent = originalHeight;
+    elements.cropX.textContent = originalX;
+    elements.cropY.textContent = originalY;
+    
+    // 在右侧预览canvas中绘制裁剪区域
+    const previewMaxSize = 280;
+    const previewScale = Math.min(
+        previewMaxSize / originalWidth,
+        previewMaxSize / originalHeight,
+        1
+    );
+    
+    elements.cropCanvas.width = originalWidth * previewScale;
+    elements.cropCanvas.height = originalHeight * previewScale;
+    
+    const cropCtx = elements.cropCanvas.getContext('2d');
+    cropCtx.drawImage(
+        currentImageData,
+        originalX, originalY, originalWidth, originalHeight,
+        0, 0, elements.cropCanvas.width, elements.cropCanvas.height
+    );
+    
+    // 显示预览和按钮
+    elements.cropCanvas.classList.add('active');
+    const emptyState = elements.cropPreviewContainer.querySelector('.empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+    
+    elements.saveCropBtn.disabled = false;
+    elements.resetSelectionBtn.disabled = false;
+}
+
+// 重置选区
+function resetSelection() {
+    isSelecting = false;
+    selectionStart = { x: 0, y: 0 };
+    selectionEnd = { x: 0, y: 0 };
+    
+    elements.selectionBox.style.display = 'none';
+    elements.selectionOverlay.style.display = 'none';
+    elements.cropCanvas.classList.remove('active');
+    
+    const emptyState = elements.cropPreviewContainer.querySelector('.empty-state');
+    if (emptyState) emptyState.style.display = 'block';
+    
+    elements.cropWidth.textContent = '-';
+    elements.cropHeight.textContent = '-';
+    elements.cropX.textContent = '-';
+    elements.cropY.textContent = '-';
+    
+    elements.saveCropBtn.disabled = true;
+    elements.resetSelectionBtn.disabled = true;
+}
+
+// ========== 保存功能 ==========
+
+// 保存裁剪后的图片
+async function saveCroppedImage() {
+    const left = Math.min(selectionStart.x, selectionEnd.x);
+    const top = Math.min(selectionStart.y, selectionEnd.y);
+    const width = Math.abs(selectionEnd.x - selectionStart.x);
+    const height = Math.abs(selectionEnd.y - selectionStart.y);
+    
+    const cropData = {
+        x: left / (scale * zoomLevel),
+        y: top / (scale * zoomLevel),
+        width: width / (scale * zoomLevel),
+        height: height / (scale * zoomLevel)
+    };
+    
+    showStatus('正在保存裁剪图片...', 'info');
+    elements.saveCropBtn.disabled = true;
+    
+    try {
+        const cropResult = await window.electronAPI.cropImage(currentImagePath, cropData);
+        
+        if (cropResult.success) {
+            const saveResult = await window.electronAPI.saveImage(cropResult.croppedPath);
+            
+            if (saveResult.success) {
+                showStatus(`裁剪图片已保存: ${saveResult.savedPath}`, 'success');
+            } else {
+                showStatus(`${saveResult.error}`, 'warning');
+            }
+        } else {
+            showStatus(`裁剪失败: ${cropResult.error}`, 'error');
+        }
+    } catch (error) {
+        showStatus(`保存失败: ${error.message}`, 'error');
+    } finally {
+        elements.saveCropBtn.disabled = false;
+    }
+}
+
+// 保存原始图片
+async function saveOriginalImage() {
+    if (!currentImagePath) return;
+    
+    showStatus('正在保存原图...', 'info');
+    elements.saveOriginalBtn.disabled = true;
+    
+    try {
+        const result = await window.electronAPI.saveImage(currentImagePath);
+        
+        if (result.success) {
+            showStatus(` 原图已保存: ${result.savedPath}`, 'success');
+        } else {
+            showStatus(`${result.error}`, 'warning');
+        }
+    } catch (error) {
+        showStatus(`保存失败: ${error.message}`, 'error');
+    } finally {
+        elements.saveOriginalBtn.disabled = false;
+    }
+}
+
+// ========== 历史记录 ==========
+
+// 从磁盘加载历史记录
+async function loadHistoryFromDisk() {
+    try {
+        const result = await window.electronAPI.loadHistory();
+        if (result.success && result.history) {
+            historyData = result.history;
+            updateHistoryList();
+            
+            // 显示截图保存目录
+            const dirResult = await window.electronAPI.getScreenshotsDir();
+            if (dirResult.success) {
+                console.log('截图保存目录:', dirResult.path);
+            }
+        }
+    } catch (error) {
+        console.error('加载历史记录失败:', error);
+    }
+}
+
+// 保存历史记录到磁盘
+async function saveHistoryToDisk() {
+    try {
+        await window.electronAPI.saveHistory(historyData);
+    } catch (error) {
+        console.error('保存历史记录失败:', error);
+    }
+}
+
+// 添加到历史记录
+function addToHistory(imagePath, fileName, timestamp, xmlPath = null, xmlFileName = null) {
+    const historyItem = {
+        path: imagePath,
+        timestamp: timestamp,
+        fileName: fileName,
+        id: Date.now(),
+        xmlPath: xmlPath,  // 节点数据路径
+        xmlFileName: xmlFileName,  // 节点数据文件名
+        hasNodes: !!xmlPath  // 标记是否有节点数据
+    };
+    
+    historyData.unshift(historyItem);
+    
+    // 限制历史记录数量
+    if (historyData.length > 50) {
+        historyData = historyData.slice(0, 50);
+    }
+    
+    updateHistoryList();
+    saveHistoryToDisk(); // 保存到磁盘
+}
+
+// 更新历史记录列表
+function updateHistoryList() {
+    if (historyData.length === 0) {
+        elements.historyList.innerHTML = '<p class="empty-state">暂无截图记录</p>';
+        return;
+    }
+    
+    elements.historyList.innerHTML = '';
+    
+    historyData.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        if (index === 0) div.classList.add('active');
+        
+        // 添加节点数据标识
+        const nodesBadge = item.hasNodes ? '' : '';
+        
+        div.innerHTML = `
+            <div class="history-item-content">
+                <div class="history-item-name">${nodesBadge} ${item.fileName}</div>
+                <div class="history-item-time">${item.timestamp}</div>
+            </div>
+        `;
+        
+        div.addEventListener('click', () => {
+            loadHistoryItem(item);
+            // 更新激活状态
+            elements.historyList.querySelectorAll('.history-item').forEach(el => {
+                el.classList.remove('active');
+            });
+            div.classList.add('active');
+        });
+        
+        elements.historyList.appendChild(div);
+    });
+}
+
+// 加载历史记录项
+async function loadHistoryItem(item) {
+    currentImagePath = item.path;
+    await loadAndDisplayImage(item.path);
+    elements.saveOriginalBtn.disabled = false;
+    
+    // 如果有节点数据，加载并显示节点树
+    if (item.hasNodes && item.xmlPath) {
+        try {
+            const result = await window.electronAPI.loadUIXml(item.xmlPath);
+            
+            if (result.success) {
+                // 解析XML数据
+                uiHierarchyData = parseUIXML(result.xmlContent);
+                
+                // 渲染节点树
+                renderNodesTree(uiHierarchyData);
+                
+                showStatus('已加载历史截图和节点信息 - 可点击图片查找对应节点', 'success');
+            } else {
+                showStatus('已加载历史截图（节点数据加载失败）', 'warning');
+                // 清空节点树
+                elements.nodesTree.innerHTML = '<p class="empty-state">节点数据文件不存在或已被删除</p>';
+                uiHierarchyData = null;
+            }
+        } catch (error) {
+            console.error('加载节点数据失败:', error);
+            showStatus('已加载历史截图（节点数据加载失败）', 'warning');
+            elements.nodesTree.innerHTML = '<p class="empty-state">节点数据加载失败</p>';
+            uiHierarchyData = null;
+        }
+    } else {
+        // 没有节点数据，清空节点树
+        elements.nodesTree.innerHTML = '<p class="empty-state">该截图没有节点信息</p>';
+        uiHierarchyData = null;
+        showStatus('已加载历史截图', 'success');
+    }
+}
+
+// 清空历史记录
+function clearHistory() {
+    if (historyData.length === 0) return;
+    
+    if (confirm('确定要清空所有历史记录吗？\n注意：这不会删除已保存的截图文件。')) {
+        historyData = [];
+        updateHistoryList();
+        saveHistoryToDisk(); // 保存到磁盘
+        showStatus('历史记录已清空', 'success');
+    }
+}
+
+// ========== 缩放和拖动功能 ==========
+
+// 缩放图片
+function zoomImage(delta) {
+    if (!currentImageData) return;
+    
+    const newZoom = Math.max(minZoom, Math.min(maxZoom, zoomLevel + delta));
+    if (newZoom === zoomLevel) return;
+    
+    zoomLevel = newZoom;
+    redrawCanvas();
+    updateZoomDisplay();
+    resetSelection();
+}
+
+// 鼠标滚轮缩放
+function onMouseWheel(e) {
+    if (!currentImageData) return;
+    
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    zoomImage(delta);
+}
+
+// 重置缩放
+function resetZoom() {
+    if (!currentImageData) return;
+    
+    zoomLevel = 1;
+    redrawCanvas();
+    updateZoomDisplay();
+    resetSelection();
+}
+
+// 适应窗口
+function fitToWindow() {
+    if (!currentImageData) return;
+    
+    const containerRect = elements.imageContainer.getBoundingClientRect();
+    const maxWidth = containerRect.width - 40;
+    const maxHeight = containerRect.height - 40;
+    
+    const newScale = Math.min(
+        maxWidth / currentImageData.width,
+        maxHeight / currentImageData.height,
+        1
+    );
+    
+    scale = newScale;
+    zoomLevel = 1;
+    redrawCanvas();
+    updateZoomDisplay();
+    resetSelection();
+}
+
+// 更新缩放显示
+function updateZoomDisplay() {
+    const percentage = Math.round(scale * zoomLevel * 100);
+    elements.zoomLevel.textContent = `${percentage}%`;
+}
+
+// 容器鼠标按下（拖动）
+function onContainerMouseDown(e) {
+    if (!currentImageData) return;
+    
+    // 只有右键才开始拖动
+    if (e.button !== 2) return;
+    
+    isDragging = true;
+    dragStart.x = e.clientX;
+    dragStart.y = e.clientY;
+    scrollStart.x = elements.imageContainer.scrollLeft;
+    scrollStart.y = elements.imageContainer.scrollTop;
+    elements.imageContainer.classList.add('dragging');
+    
+    e.preventDefault();
+}
+
+// 容器鼠标移动（拖动）
+function onContainerMouseMove(e) {
+    if (!isDragging) return;
+    
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    
+    // 计算新的滚动位置
+    let newScrollLeft = scrollStart.x - dx;
+    let newScrollTop = scrollStart.y - dy;
+    
+    // 限制滚动范围，确保图片至少有一部分可见
+    const container = elements.imageContainer;
+    const maxScrollLeft = container.scrollWidth - container.clientWidth;
+    const maxScrollTop = container.scrollHeight - container.clientHeight;
+    
+    // 边界限制
+    newScrollLeft = Math.max(0, Math.min(newScrollLeft, maxScrollLeft));
+    newScrollTop = Math.max(0, Math.min(newScrollTop, maxScrollTop));
+    
+    elements.imageContainer.scrollLeft = newScrollLeft;
+    elements.imageContainer.scrollTop = newScrollTop;
+}
+
+// 容器鼠标抬起（拖动）
+function onContainerMouseUp(e) {
+    isDragging = false;
+    elements.imageContainer.classList.remove('dragging');
+}
+
+// ========== 工具函数 ==========
+
+// 生成随机ID
+function generateRandomId(length) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// 显示状态消息
+function showStatus(message, type = 'info') {
+    elements.statusMessage.textContent = message;
+    elements.statusMessage.className = `status-message ${type}`;
+    
+    // 自动隐藏成功消息
+    if (type === 'success') {
+        setTimeout(() => {
+            elements.statusMessage.className = 'status-message';
+        }, 5000);
+    }
+}
+
+// ========== 标签页切换 ==========
+
+// 切换标签页
+function switchTab(tabName) {
+    if (tabName === 'crop') {
+        elements.cropTabBtn.classList.add('active');
+        elements.nodesTabBtn.classList.remove('active');
+        elements.cropPanel.classList.add('active');
+        elements.nodesPanel.classList.remove('active');
+    } else if (tabName === 'nodes') {
+        elements.cropTabBtn.classList.remove('active');
+        elements.nodesTabBtn.classList.add('active');
+        elements.cropPanel.classList.remove('active');
+        elements.nodesPanel.classList.add('active');
+    }
+}
+
+// ========== 节点抓取功能 ==========
+
+// 抓取UI层级结构
+async function dumpUIHierarchy() {
+    if (!selectedDevice) {
+        showStatus('请先选择设备', 'warning');
+        return;
+    }
+    
+    showStatus('正在抓取UI层级信息和截图...', 'info');
+    elements.dumpUIBtn.disabled = true;
+    
+    try {
+        const result = await window.electronAPI.dumpUIHierarchy(selectedDevice);
+        
+        if (result.success) {
+            // 保存当前截图路径
+            currentImagePath = result.screenshotPath;
+            
+            // 加载并显示截图
+            await loadAndDisplayImage(currentImagePath);
+            
+            // 解析XML数据
+            uiHierarchyData = parseUIXML(result.xmlContent);
+            
+            // 渲染节点树
+            renderNodesTree(uiHierarchyData);
+            
+            // 添加到历史记录（包含节点数据）
+            addToHistory(result.screenshotPath, result.screenshotFileName, result.timestamp, result.xmlPath, result.xmlFileName);
+            
+            // 切换到节点信息标签页
+            switchTab('nodes');
+            
+            // 启用保存原图按钮
+            elements.saveOriginalBtn.disabled = false;
+            
+            showStatus('UI层级信息和截图抓取成功！点击节点可在图片上查看位置', 'success');
+        } else {
+            showStatus(`抓取失败: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showStatus(`抓取失败: ${error.message}`, 'error');
+    } finally {
+        elements.dumpUIBtn.disabled = false;
+    }
+}
+
+// 解析UI层级XML
+function parseUIXML(xmlString) {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
+    
+    // 检查解析错误
+    const parserError = xmlDoc.querySelector('parsererror');
+    if (parserError) {
+        throw new Error('XML解析失败');
+    }
+    
+    // 递归解析节点
+    function parseNode(xmlNode, depth = 0) {
+        const nodeData = {
+            tag: xmlNode.tagName,
+            attributes: {},
+            children: [],
+            depth: depth,
+            id: generateRandomId(8)
+        };
+        
+        // 提取所有属性
+        for (let i = 0; i < xmlNode.attributes.length; i++) {
+            const attr = xmlNode.attributes[i];
+            nodeData.attributes[attr.name] = attr.value;
+        }
+        
+        // 解析子节点
+        for (let i = 0; i < xmlNode.children.length; i++) {
+            const childNode = parseNode(xmlNode.children[i], depth + 1);
+            nodeData.children.push(childNode);
+        }
+        
+        return nodeData;
+    }
+    
+    // 从根节点开始解析
+    const rootNode = xmlDoc.documentElement;
+    return parseNode(rootNode);
+}
+
+// 渲染节点树
+function renderNodesTree(nodeData) {
+    elements.nodesTree.innerHTML = '';
+    
+    if (!nodeData) {
+        elements.nodesTree.innerHTML = '<p class="empty-state">无节点数据</p>';
+        return;
+    }
+    
+    const treeContainer = document.createElement('div');
+    treeContainer.className = 'tree-root';
+    
+    // 递归渲染节点
+    function renderNode(node, parentElement) {
+        const nodeItem = document.createElement('div');
+        nodeItem.className = 'tree-node';
+        nodeItem.dataset.nodeId = node.id;
+        nodeItem.dataset.depth = node.depth;
+        // 保存原始节点数据供搜索使用
+        nodeItem._nodeData = node;
+        
+        // 创建节点内容容器
+        const nodeContent = document.createElement('div');
+        nodeContent.className = 'tree-node-content';
+        
+        // 缩进
+        const indent = document.createElement('span');
+        indent.className = 'tree-indent';
+        indent.style.width = (node.depth * 20) + 'px';
+        
+        // 展开/折叠按钮
+        const toggle = document.createElement('span');
+        toggle.className = 'tree-toggle';
+        if (node.children.length > 0) {
+            toggle.textContent = '▶';
+            toggle.classList.add('has-children');
+        } else {
+            toggle.textContent = '•';
+        }
+        
+        // 节点标签
+        const label = document.createElement('span');
+        label.className = 'tree-label';
+        
+        // 构建节点显示文本
+        let displayText = node.tag;
+        const resId = node.attributes['resource-id'] || '';
+        const text = node.attributes['text'] || '';
+        const className = node.attributes['class'] || '';
+        
+        if (resId) {
+            displayText += ` [${resId.split('/').pop()}]`;
+        }
+        if (text && text.length < 20) {
+            displayText += ` "${text}"`;
+        }
+        if (!resId && className) {
+            displayText += ` (${className.split('.').pop()})`;
+        }
+        
+        label.textContent = displayText;
+        
+        // 组装节点内容
+        nodeContent.appendChild(indent);
+        nodeContent.appendChild(toggle);
+        nodeContent.appendChild(label);
+        nodeItem.appendChild(nodeContent);
+        
+        // 点击展开/折叠
+        toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (node.children.length > 0) {
+                nodeItem.classList.toggle('expanded');
+                toggle.textContent = nodeItem.classList.contains('expanded') ? '▼' : '▶';
+            }
+        });
+        
+        // 点击选中节点
+        nodeContent.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectNode(node, nodeItem);
+        });
+        
+        parentElement.appendChild(nodeItem);
+        
+        // 渲染子节点容器
+        if (node.children.length > 0) {
+            const childrenContainer = document.createElement('div');
+            childrenContainer.className = 'tree-children';
+            nodeItem.appendChild(childrenContainer);
+            
+            // 递归渲染子节点
+            node.children.forEach(child => {
+                renderNode(child, childrenContainer);
+            });
+        }
+    }
+    
+    renderNode(nodeData, treeContainer);
+    elements.nodesTree.appendChild(treeContainer);
+}
+
+// 选中节点
+function selectNode(node, nodeElement) {
+    selectedNode = node;
+    
+    // 更新选中状态
+    elements.nodesTree.querySelectorAll('.tree-node').forEach(el => {
+        el.classList.remove('selected');
+    });
+    nodeElement.classList.add('selected');
+    
+    // 显示节点详情
+    displayNodeDetails(node);
+    
+    // 在图片上高亮显示节点位置
+    highlightNodeOnImage(node);
+}
+
+// 显示节点详情
+function displayNodeDetails(node) {
+    if (!node) {
+        elements.nodeDetails.innerHTML = '<p class="empty-state">请在左侧树中选择节点</p>';
+        return;
+    }
+    
+    let html = '<div class="node-details-content">';
+    
+    // 显示标签
+    html += `<div class="detail-item"><strong>标签:</strong> <span>${node.tag}</span></div>`;
+    
+    // 显示所有属性
+    const importantAttrs = ['resource-id', 'class', 'package', 'text', 'content-desc', 'checkable', 'checked', 'clickable', 'enabled', 'focusable', 'focused', 'scrollable', 'long-clickable', 'password', 'selected', 'bounds'];
+    
+    for (const attr of importantAttrs) {
+        if (node.attributes[attr] !== undefined) {
+            let value = node.attributes[attr];
+            // 高亮显示bounds坐标
+            if (attr === 'bounds') {
+                value = `<code>${value}</code>`;
+            }
+            html += `<div class="detail-item"><strong>${attr}:</strong> <span>${value}</span></div>`;
+        }
+    }
+    
+    // 显示其他属性
+    for (const attr in node.attributes) {
+        if (!importantAttrs.includes(attr)) {
+            html += `<div class="detail-item"><strong>${attr}:</strong> <span>${node.attributes[attr]}</span></div>`;
+        }
+    }
+    
+    // 显示子节点数量
+    html += `<div class="detail-item"><strong>子节点数:</strong> <span>${node.children.length}</span></div>`;
+    
+    html += '</div>';
+    
+    elements.nodeDetails.innerHTML = html;
+}
+
+// 节点搜索
+function onNodeSearch(e) {
+    const searchText = e.target.value.toLowerCase().trim();
+    
+    // 清除之前选中的节点
+    selectedNode = null;
+    elements.nodesTree.querySelectorAll('.tree-node').forEach(node => {
+        node.classList.remove('selected');
+    });
+    elements.nodeDetails.innerHTML = '<p class="empty-state">请在左侧树中选择节点</p>';
+    // 隐藏节点高亮框
+    elements.nodeHighlightOverlay.style.display = 'none';
+    
+    if (!searchText) {
+        // 清空搜索，显示所有节点
+        elements.nodesTree.querySelectorAll('.tree-node').forEach(node => {
+            node.style.display = '';
+            node.classList.remove('search-match');
+        });
+        return;
+    }
+    
+    // console.log('🔍 开始搜索:', searchText);
+    let matchCount = 0;
+    
+    // 搜索并高亮匹配的节点
+    elements.nodesTree.querySelectorAll('.tree-node').forEach(nodeElement => {
+        // 获取节点的原始数据
+        const nodeData = nodeElement._nodeData;
+        if (!nodeData) {
+            console.warn('⚠️ 节点缺少 _nodeData:', nodeElement);
+            return;
+        }
+        
+        // 搜索所有相关属性（包含匹配）
+        const matches = 
+            nodeData.tag.toLowerCase().includes(searchText) ||
+            (nodeData.attributes['resource-id'] || '').toLowerCase().includes(searchText) ||
+            (nodeData.attributes['text'] || '').toLowerCase().includes(searchText) ||
+            (nodeData.attributes['content-desc'] || '').toLowerCase().includes(searchText) ||
+            (nodeData.attributes['class'] || '').toLowerCase().includes(searchText) ||
+            (nodeData.attributes['package'] || '').toLowerCase().includes(searchText);
+        
+        if (matches) {
+            matchCount++;
+            nodeElement.style.display = '';
+            nodeElement.classList.add('search-match');
+            
+            // 输出匹配的节点信息
+            // console.log('✅ 匹配节点:', {
+            //     tag: nodeData.tag,
+            //     'resource-id': nodeData.attributes['resource-id'],
+            //     text: nodeData.attributes['text'],
+            //     'content-desc': nodeData.attributes['content-desc'],
+            //     class: nodeData.attributes['class']
+            // });
+            
+            // 展开父节点以显示匹配项
+            let parent = nodeElement.parentElement;
+            while (parent && parent.classList.contains('tree-children')) {
+                const parentNode = parent.parentElement;
+                if (parentNode && parentNode.classList.contains('tree-node')) {
+                    parentNode.classList.add('expanded');
+                    parentNode.style.display = ''; // 确保父节点也显示
+                    const toggle = parentNode.querySelector('.tree-toggle');
+                    if (toggle) {
+                        toggle.textContent = '▼';
+                    }
+                }
+                parent = parentNode ? parentNode.parentElement : null;
+            }
+        } else {
+            nodeElement.style.display = 'none';
+            nodeElement.classList.remove('search-match');
+        }
+    });
+    
+    // console.log(`📊 搜索完成，找到 ${matchCount} 个匹配节点`);
+}
+
+// 展开所有节点
+function expandAllNodes() {
+    elements.nodesTree.querySelectorAll('.tree-node').forEach(node => {
+        if (node.querySelector('.tree-toggle.has-children')) {
+            node.classList.add('expanded');
+            const toggle = node.querySelector('.tree-toggle');
+            if (toggle) {
+                toggle.textContent = '▼';
+            }
+        }
+    });
+}
+
+// 折叠所有节点
+function collapseAllNodes() {
+    elements.nodesTree.querySelectorAll('.tree-node').forEach(node => {
+        node.classList.remove('expanded');
+        const toggle = node.querySelector('.tree-toggle');
+        if (toggle && toggle.classList.contains('has-children')) {
+            toggle.textContent = '▶';
+        }
+    });
+}
+
+// 在图片上高亮显示节点位置
+function highlightNodeOnImage(node) {
+    // 如果没有图片，不显示高亮
+    if (!currentImageData) {
+        hideNodeHighlight();
+        return;
+    }
+    
+    // 获取节点的 bounds 属性
+    const bounds = node.attributes['bounds'];
+    if (!bounds) {
+        hideNodeHighlight();
+        return;
+    }
+    
+    // 解析 bounds: [x1,y1][x2,y2]
+    const boundsRect = parseBounds(bounds);
+    if (!boundsRect) {
+        hideNodeHighlight();
+        return;
+    }
+    
+    // 计算在当前缩放下的显示坐标
+    const displayRect = {
+        x: boundsRect.x * scale * zoomLevel,
+        y: boundsRect.y * scale * zoomLevel,
+        width: boundsRect.width * scale * zoomLevel,
+        height: boundsRect.height * scale * zoomLevel
+    };
+    
+    // 显示高亮框
+    elements.nodeHighlightBox.style.left = displayRect.x + 'px';
+    elements.nodeHighlightBox.style.top = displayRect.y + 'px';
+    elements.nodeHighlightBox.style.width = displayRect.width + 'px';
+    elements.nodeHighlightBox.style.height = displayRect.height + 'px';
+    elements.nodeHighlightOverlay.style.display = 'block';
+}
+
+// 隐藏节点高亮
+function hideNodeHighlight() {
+    if (elements.nodeHighlightOverlay) {
+        elements.nodeHighlightOverlay.style.display = 'none';
+    }
+}
+
+// 解析 bounds 字符串: [x1,y1][x2,y2]
+function parseBounds(boundsStr) {
+    try {
+        // 匹配格式 [x1,y1][x2,y2]
+        const match = boundsStr.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
+        if (!match) {
+            return null;
+        }
+        
+        const x1 = parseInt(match[1]);
+        const y1 = parseInt(match[2]);
+        const x2 = parseInt(match[3]);
+        const y2 = parseInt(match[4]);
+        
+        return {
+            x: x1,
+            y: y1,
+            width: x2 - x1,
+            height: y2 - y1
+        };
+    } catch (error) {
+        console.error('解析 bounds 失败:', error);
+        return null;
+    }
+}
+
+// 查找包含指定坐标的节点（递归查找最小的匹配节点）
+function findNodeByCoordinates(x, y, node = uiHierarchyData, depth = 0) {
+    if (!node) {
+        if (depth === 0) console.log('节点数据为空');
+        return null;
+    }
+    
+    // 获取节点的 bounds
+    const bounds = node.attributes['bounds'];
+    
+    // 如果当前节点没有 bounds（如根节点 hierarchy），则在子节点中查找
+    if (!bounds) {
+        if (depth === 0) console.log('根节点没有 bounds，从子节点开始查找');
+        
+        if (node.children && node.children.length > 0) {
+            // 收集所有匹配的子节点
+            let bestMatch = null;
+            let minArea = Infinity;
+            
+            for (let child of node.children) {
+                const foundChild = findNodeByCoordinates(x, y, child, depth + 1);
+                if (foundChild) {
+                    const childBounds = foundChild.attributes['bounds'];
+                    if (childBounds) {
+                        const childRect = parseBounds(childBounds);
+                        if (childRect) {
+                            const area = childRect.width * childRect.height;
+                            if (area < minArea) {
+                                minArea = area;
+                                bestMatch = foundChild;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (depth === 0 && !bestMatch) {
+                console.log('在所有子节点中未找到匹配');
+            }
+            return bestMatch;
+        }
+        
+        return null;
+    }
+    
+    const rect = parseBounds(bounds);
+    if (!rect) {
+        console.log('bounds 解析失败:', bounds);
+        return null;
+    }
+    
+    if (depth === 0) {
+        console.log('开始查找，坐标:', x, y);
+    }
+    
+    // 检查坐标是否在当前节点范围内
+    if (x >= rect.x && x <= rect.x + rect.width &&
+        y >= rect.y && y <= rect.y + rect.height) {
+        
+        // 收集所有匹配的子节点，找到面积最小的
+        let bestMatch = node; // 默认为当前节点
+        let minArea = rect.width * rect.height;
+        
+        if (node.children && node.children.length > 0) {
+            for (let child of node.children) {
+                const foundChild = findNodeByCoordinates(x, y, child, depth + 1);
+                if (foundChild) {
+                    const childBounds = foundChild.attributes['bounds'];
+                    if (childBounds) {
+                        const childRect = parseBounds(childBounds);
+                        if (childRect) {
+                            const area = childRect.width * childRect.height;
+                            if (area < minArea) {
+                                minArea = area;
+                                bestMatch = foundChild;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 返回面积最小的匹配节点
+        if (bestMatch === node) {
+            console.log('找到节点（当前层级）:', node.tag, rect, '面积:', minArea);
+        }
+        return bestMatch;
+    }
+    
+    return null;
+}
+
+// ========== 拖动调整大小 ==========
+
+let isResizing = false;
+
+// 开始拖动调整大小
+function startResize(e) {
+    isResizing = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    
+    // 添加全局监听器
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+    
+    e.preventDefault();
+}
+
+// 执行调整大小
+function doResize(e) {
+    if (!isResizing) return;
+    
+    // 获取窗口宽度和鼠标位置
+    const windowWidth = window.innerWidth;
+    const mouseX = e.clientX;
+    
+    // 计算新的右侧边栏宽度（从右边界到鼠标位置）
+    const newWidth = windowWidth - mouseX - 5; // 减去分隔条宽度
+    
+    // 限制在最小和最大宽度之间
+    const minWidth = 250;
+    const maxWidth = 600;
+    const finalWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+    
+    // 应用新宽度
+    elements.sidebarRight.style.width = finalWidth + 'px';
+}
+
+// 停止拖动调整大小
+function stopResize() {
+    isResizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    
+    // 移除全局监听器
+    document.removeEventListener('mousemove', doResize);
+    document.removeEventListener('mouseup', stopResize);
+}
+
+// 在节点树中展开并选中节点
+function expandAndSelectNodeInTree(targetNode) {
+    if (!targetNode) return;
+    
+    // 找到所有需要展开的父节点路径
+    const pathToNode = [];
+    
+    function findPath(node, path = []) {
+        if (node.id === targetNode.id) {
+            pathToNode.push(...path);
+            return true;
+        }
+        
+        if (node.children && node.children.length > 0) {
+            for (let child of node.children) {
+                if (findPath(child, [...path, node])) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    if (uiHierarchyData) {
+        findPath(uiHierarchyData);
+    }
+    
+    // 展开所有父节点
+    pathToNode.forEach(parentNode => {
+        const nodeElement = elements.nodesTree.querySelector(`[data-node-id="${parentNode.id}"]`);
+        if (nodeElement) {
+            nodeElement.classList.add('expanded');
+            const toggle = nodeElement.querySelector('.tree-toggle');
+            if (toggle && toggle.classList.contains('has-children')) {
+                toggle.textContent = '▼';
+            }
+        }
+    });
+    
+    // 选中目标节点
+    const targetElement = elements.nodesTree.querySelector(`[data-node-id="${targetNode.id}"]`);
+    if (targetElement) {
+        selectNode(targetNode, targetElement);
+        
+        // 滚动到可见区域
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // 切换到节点信息标签页
+        switchTab('nodes');
+    }
+}

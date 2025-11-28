@@ -140,6 +140,18 @@
         </aside>
     </div>
 
+    <!-- 工具函数模块（最先加载） -->
+    <script src="modules/Utils.js"></script>
+    
+    <!-- 核心功能模块 -->
+    <script src="modules/DeviceManager.js"></script>
+    <script src="modules/HistoryManager.js"></script>
+    <script src="modules/ScreenshotManager.js"></script>
+    <script src="modules/CanvasManager.js"></script>
+    <script src="modules/NodeManager.js"></script>
+    <script src="modules/UIManager.js"></script>
+    
+    <!-- 主渲染进程脚本（最后加载） -->
     <script src="renderer.js"></script>
 </body>
 </html>
