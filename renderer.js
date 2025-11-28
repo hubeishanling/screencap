@@ -60,8 +60,10 @@ function initializeApp() {
         // 标签页
         cropTabBtn: document.getElementById('crop-tab-btn'),
         nodesTabBtn: document.getElementById('nodes-tab-btn'),
+        colorTabBtn: document.getElementById('color-tab-btn'),
         cropPanel: document.getElementById('crop-panel'),
         nodesPanel: document.getElementById('nodes-panel'),
+        colorPanel: document.getElementById('color-panel'),
         
         // 节点树
         nodesTree: document.getElementById('nodes-tree'),
@@ -74,7 +76,21 @@ function initializeApp() {
         
         // 侧边栏调整
         sidebarResizer: document.getElementById('sidebar-resizer'),
-        sidebarRight: document.getElementById('sidebar-right')
+        sidebarRight: document.getElementById('sidebar-right'),
+        
+        // 取色工具
+        colorPickBtn: document.getElementById('color-pick-btn'),
+        colorTypeSelect: document.getElementById('color-type-select'),
+        gridSizeInput: document.getElementById('grid-size-input'),
+        gridSizeValue: document.getElementById('grid-size-value'),
+        gridSizeControl: document.getElementById('grid-size-control'),
+        clearColorHistoryBtn: document.getElementById('clear-color-history-btn'),
+        recolorAreaBtn: document.getElementById('recolor-area-btn'),
+        colorHistoryList: document.getElementById('color-history-list'),
+        colorPreview: document.getElementById('color-preview'),
+        colorPreviewSwatch: document.getElementById('color-preview-swatch'),
+        colorPreviewHex: document.getElementById('color-preview-hex'),
+        colorPreviewRgb: document.getElementById('color-preview-rgb')
     };
     
     // 初始化各个模块
@@ -84,6 +100,7 @@ function initializeApp() {
     window.ScreenshotManager.initElements(elements);
     window.CanvasManager.initElements(elements);
     window.NodeManager.initElements(elements);
+    window.ColorPickerManager.initElements(elements);
     window.UIManager.initElements(elements);
 }
 
@@ -109,6 +126,9 @@ function setupEventListeners() {
     
     // 节点管理器事件（在NodeManager内部设置）
     window.NodeManager.setupEventListeners();
+    
+    // 取色管理器事件（在ColorPickerManager内部设置）
+    window.ColorPickerManager.setupEventListeners();
     
     // UI管理器事件（在UIManager内部设置）
     window.UIManager.setupEventListeners();

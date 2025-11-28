@@ -30,8 +30,9 @@ class ScreenshotManager {
                 // 添加到历史记录
                 window.HistoryManager.addToHistory(result.imagePath, result.fileName, result.timestamp);
                 
-                // 启用保存原图按钮
+                // 启用保存原图按钮和取色按钮
                 this.elements.saveOriginalBtn.disabled = false;
+                this.elements.colorPickBtn.disabled = false;
                 
                 window.showStatus('截图成功！使用鼠标在图片上框选需要裁剪的区域', 'success');
             } else {

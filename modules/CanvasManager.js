@@ -189,6 +189,11 @@ class CanvasManager {
         if (width < 10 || height < 10) {
             this.resetSelection();
             
+            // 如果处于取色模式，不触发节点选择
+            if (window.ColorPickerManager && window.ColorPickerManager.isActive()) {
+                return;
+            }
+            
             // 尝试查找点击位置的节点
             if (window.NodeManager && window.NodeManager.uiHierarchyData) {
                 const rect = this.elements.imageCanvas.getBoundingClientRect();
@@ -314,6 +319,11 @@ class CanvasManager {
         
         this.elements.saveCropBtn.disabled = false;
         this.elements.resetSelectionBtn.disabled = false;
+        
+        // 通知取色管理器，有选区了，可以启用重新取色按钮
+        if (window.ColorPickerManager) {
+            window.ColorPickerManager.onSelectionAvailable();
+        }
     }
 
     // 重置选区

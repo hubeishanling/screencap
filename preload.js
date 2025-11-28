@@ -23,5 +23,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // UI节点抓取
   dumpUIHierarchy: (deviceId) => ipcRenderer.invoke('dump-ui-hierarchy', deviceId),
-  loadUIXml: (xmlPath) => ipcRenderer.invoke('load-ui-xml', xmlPath)
+  loadUIXml: (xmlPath) => ipcRenderer.invoke('load-ui-xml', xmlPath),
+  
+  // 取色功能
+  exportColorData: (colorData) => ipcRenderer.invoke('export-color-data', colorData)
 });

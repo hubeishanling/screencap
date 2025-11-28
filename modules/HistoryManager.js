@@ -103,6 +103,7 @@ class HistoryManager {
         window.currentImagePath = item.path;
         await window.CanvasManager.loadAndDisplayImage(item.path);
         this.elements.saveOriginalBtn.disabled = false;
+        this.elements.colorPickBtn.disabled = false; // 启用取色按钮
         
         // 如果有节点数据，加载并显示节点树
         if (item.hasNodes && item.xmlPath) {

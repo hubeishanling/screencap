@@ -403,3 +403,26 @@ ipcMain.handle('dump-ui-hierarchy', async (event, deviceId) => {
     return { success: false, error: error.message };
   }
 });
+
+// 导出取色数据
+ipcMain.handle('export-color-data', async (event, colorData) => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: '导出取色数据',
+      defaultPath: path.join(app.getPath('documents'), `color_data_${Date.now()}.json`),
+      filters: [
+        { name: 'JSON文件', extensions: ['json'] },
+        { name: '所有文件', extensions: ['*'] }
+      ]
+    });
+    
+    if (!result.canceled && result.filePath) {
+      fs.writeFileSync(result.filePath, JSON.stringify(colorData, null, 2), 'utf-8');
+      return { success: true, filePath: result.filePath };
+    }
+    
+    return { success: false, error: '用户取消导出' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});

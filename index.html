@@ -31,6 +31,7 @@
                 <button id="refresh-devices-btn" class="btn btn-small btn-primary">刷新设备</button>
                 <button id="capture-btn" class="btn btn-small btn-success" disabled>截取屏幕</button>
                 <button id="dump-ui-btn" class="btn btn-small btn-info" disabled>抓取节点</button>
+                <button id="color-pick-btn" class="btn btn-small btn-secondary" disabled>取色模式</button>
             </div>
         </div>
     </header>
@@ -82,6 +83,14 @@
                             <div class="crosshair-line crosshair-v"></div>
                             <div class="crosshair-coords" id="crosshair-coords">0, 0</div>
                         </div>
+                        <!-- 颜色预览 -->
+                        <div id="color-preview" class="color-preview" style="display: none;">
+                            <div class="color-preview-swatch" id="color-preview-swatch"></div>
+                            <div class="color-preview-info">
+                                <div id="color-preview-hex" class="color-hex">#000000</div>
+                                <div id="color-preview-rgb" class="color-coords">(0, 0)</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -96,6 +105,7 @@
                 <div class="tab-buttons">
                     <button id="crop-tab-btn" class="tab-btn active">裁剪预览</button>
                     <button id="nodes-tab-btn" class="tab-btn">节点信息</button>
+                    <button id="color-tab-btn" class="tab-btn">取色工具</button>
                 </div>
             </div>
             
@@ -137,6 +147,34 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- 取色工具面板 -->
+            <div id="color-panel" class="panel-content">
+                <div class="color-picker-controls">
+                    <div class="control-group">
+                        <label for="color-type-select">取色类型：</label>
+                        <select id="color-type-select" class="color-select">
+                            <option value="single">单点取色</option>
+                            <option value="area">范围取色</option>
+                        </select>
+                    </div>
+                    <div class="control-group" id="grid-size-control" style="display: none;">
+                        <label for="grid-size-input">取色点数：</label>
+                        <input type="range" id="grid-size-input" min="5" max="100" value="25" step="5">
+                        <span id="grid-size-value" class="value-display">25</span>
+                    </div>
+                    <div class="color-actions">
+                        <button id="clear-color-history-btn" class="btn btn-block btn-secondary">清空记录</button>
+                        <button id="recolor-area-btn" class="btn btn-block btn-success" disabled>重新取色</button>
+                    </div>
+                </div>
+                <div class="color-history-container">
+                    <h3>取色记录</h3>
+                    <div id="color-history-list" class="color-history-list">
+                        <p class="empty-state">暂无取色记录<br>点击顶部"取色模式"按钮开始</p>
+                    </div>
+                </div>
+            </div>
         </aside>
     </div>
 
@@ -149,6 +187,7 @@
     <script src="modules/ScreenshotManager.js"></script>
     <script src="modules/CanvasManager.js"></script>
     <script src="modules/NodeManager.js"></script>
+    <script src="modules/ColorPickerManager.js"></script>
     <script src="modules/UIManager.js"></script>
     
     <!-- 主渲染进程脚本（最后加载） -->

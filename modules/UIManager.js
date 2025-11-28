@@ -15,6 +15,7 @@ class UIManager {
         // 标签页切换
         this.elements.cropTabBtn.addEventListener('click', () => this.switchTab('crop'));
         this.elements.nodesTabBtn.addEventListener('click', () => this.switchTab('nodes'));
+        this.elements.colorTabBtn.addEventListener('click', () => this.switchTab('color'));
         
         // 拖动调整大小
         this.elements.sidebarResizer.addEventListener('mousedown', this.startResize.bind(this));
@@ -22,16 +23,24 @@ class UIManager {
 
     // 切换标签页
     switchTab(tabName) {
+        // 移除所有标签的激活状态
+        this.elements.cropTabBtn.classList.remove('active');
+        this.elements.nodesTabBtn.classList.remove('active');
+        this.elements.colorTabBtn.classList.remove('active');
+        this.elements.cropPanel.classList.remove('active');
+        this.elements.nodesPanel.classList.remove('active');
+        this.elements.colorPanel.classList.remove('active');
+        
+        // 激活选中的标签
         if (tabName === 'crop') {
             this.elements.cropTabBtn.classList.add('active');
-            this.elements.nodesTabBtn.classList.remove('active');
             this.elements.cropPanel.classList.add('active');
-            this.elements.nodesPanel.classList.remove('active');
         } else if (tabName === 'nodes') {
-            this.elements.cropTabBtn.classList.remove('active');
             this.elements.nodesTabBtn.classList.add('active');
-            this.elements.cropPanel.classList.remove('active');
             this.elements.nodesPanel.classList.add('active');
+        } else if (tabName === 'color') {
+            this.elements.colorTabBtn.classList.add('active');
+            this.elements.colorPanel.classList.add('active');
         }
     }
 
