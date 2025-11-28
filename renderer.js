@@ -11,8 +11,12 @@ let elements = {};
 document.addEventListener('DOMContentLoaded', async () => {
     initializeApp();
     setupEventListeners();
+    
+    // 加载历史记录
     await window.HistoryManager.loadHistoryFromDisk();
-    window.DeviceManager.refreshDevices();
+    
+    // 自动刷新设备列表
+    await window.DeviceManager.refreshDevices();
 });
 
 // 初始化应用

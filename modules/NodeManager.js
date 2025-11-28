@@ -538,6 +538,22 @@ class NodeManager {
         this.hideNodeHighlight();
     }
 
+    // 清空节点详情
+    clearNodeDetails() {
+        this.selectedNode = null;
+        if (this.elements.nodeDetails) {
+            this.elements.nodeDetails.innerHTML = '<p class="empty-state">请在左侧树中选择节点</p>';
+        }
+        // 移除所有节点的选中状态
+        if (this.elements.nodesTree) {
+            this.elements.nodesTree.querySelectorAll('.tree-node').forEach(node => {
+                node.classList.remove('selected');
+            });
+        }
+        // 隐藏高亮框
+        this.hideNodeHighlight();
+    }
+
     // 生成随机ID
     generateRandomId(length) {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
