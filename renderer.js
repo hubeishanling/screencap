@@ -677,7 +677,7 @@ function updateHistoryList() {
         if (index === 0) div.classList.add('active');
         
         // 添加节点数据标识
-        const nodesBadge = item.hasNodes ? '<span class="nodes-badge">📊</span>' : '';
+        const nodesBadge = item.hasNodes ? '' : '';
         
         div.innerHTML = `
             <div class="history-item-content">
@@ -1007,6 +1007,8 @@ function renderNodesTree(nodeData) {
         nodeItem.className = 'tree-node';
         nodeItem.dataset.nodeId = node.id;
         nodeItem.dataset.depth = node.depth;
+        // 保存原始节点数据供搜索使用
+        nodeItem._nodeData = node;
         
         // 创建节点内容容器
         const nodeContent = document.createElement('div');
@@ -1151,6 +1153,15 @@ function displayNodeDetails(node) {
 function onNodeSearch(e) {
     const searchText = e.target.value.toLowerCase().trim();
     
+    // 清除之前选中的节点
+    selectedNode = null;
+    elements.nodesTree.querySelectorAll('.tree-node').forEach(node => {
+        node.classList.remove('selected');
+    });
+    elements.nodeDetails.innerHTML = '<p class="empty-state">请在左侧树中选择节点</p>';
+    // 隐藏节点高亮框
+    elements.nodeHighlightOverlay.style.display = 'none';
+    
     if (!searchText) {
         // 清空搜索，显示所有节点
         elements.nodesTree.querySelectorAll('.tree-node').forEach(node => {
@@ -1160,16 +1171,40 @@ function onNodeSearch(e) {
         return;
     }
     
+    // console.log('🔍 开始搜索:', searchText);
+    let matchCount = 0;
+    
     // 搜索并高亮匹配的节点
     elements.nodesTree.querySelectorAll('.tree-node').forEach(nodeElement => {
-        const label = nodeElement.querySelector('.tree-label');
-        if (!label) return;
+        // 获取节点的原始数据
+        const nodeData = nodeElement._nodeData;
+        if (!nodeData) {
+            console.warn('⚠️ 节点缺少 _nodeData:', nodeElement);
+            return;
+        }
         
-        const matches = label.textContent.toLowerCase().includes(searchText);
+        // 搜索所有相关属性（包含匹配）
+        const matches = 
+            nodeData.tag.toLowerCase().includes(searchText) ||
+            (nodeData.attributes['resource-id'] || '').toLowerCase().includes(searchText) ||
+            (nodeData.attributes['text'] || '').toLowerCase().includes(searchText) ||
+            (nodeData.attributes['content-desc'] || '').toLowerCase().includes(searchText) ||
+            (nodeData.attributes['class'] || '').toLowerCase().includes(searchText) ||
+            (nodeData.attributes['package'] || '').toLowerCase().includes(searchText);
         
         if (matches) {
+            matchCount++;
             nodeElement.style.display = '';
             nodeElement.classList.add('search-match');
+            
+            // 输出匹配的节点信息
+            // console.log('✅ 匹配节点:', {
+            //     tag: nodeData.tag,
+            //     'resource-id': nodeData.attributes['resource-id'],
+            //     text: nodeData.attributes['text'],
+            //     'content-desc': nodeData.attributes['content-desc'],
+            //     class: nodeData.attributes['class']
+            // });
             
             // 展开父节点以显示匹配项
             let parent = nodeElement.parentElement;
@@ -1177,6 +1212,7 @@ function onNodeSearch(e) {
                 const parentNode = parent.parentElement;
                 if (parentNode && parentNode.classList.contains('tree-node')) {
                     parentNode.classList.add('expanded');
+                    parentNode.style.display = ''; // 确保父节点也显示
                     const toggle = parentNode.querySelector('.tree-toggle');
                     if (toggle) {
                         toggle.textContent = '▼';
@@ -1189,6 +1225,8 @@ function onNodeSearch(e) {
             nodeElement.classList.remove('search-match');
         }
     });
+    
+    // console.log(`📊 搜索完成，找到 ${matchCount} 个匹配节点`);
 }
 
 // 展开所有节点
