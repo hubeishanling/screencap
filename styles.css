@@ -221,6 +221,7 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
 }
 
 .status-message {
@@ -258,8 +259,7 @@ body {
 .bottom-controls {
     position: absolute;
     bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 20px;
     z-index: 100;
     display: none;
     align-items: center;
@@ -309,12 +309,20 @@ body {
     position: relative;
     flex: 1;
     background: #f5f7fa;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     overflow: auto;
-    padding: 20px;
+    padding: 60px;
     cursor: default;
+    /* 使用传统方式居中，而非flex，以确保滚动条正常工作 */
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* 使用伪元素辅助垂直居中 */
+.image-container::before {
+    content: '';
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
 }
 
 .image-container.dragging {
@@ -329,6 +337,17 @@ body {
     color: #909399;
     font-size: 1.1rem;
     text-align: center;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+}
+
+#canvas-wrapper {
+    display: inline-block;
+    vertical-align: middle;
+    white-space: normal;
 }
 
 #image-canvas {

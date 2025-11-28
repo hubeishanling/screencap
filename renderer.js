@@ -835,8 +835,21 @@ function onContainerMouseMove(e) {
     const dx = e.clientX - dragStart.x;
     const dy = e.clientY - dragStart.y;
     
-    elements.imageContainer.scrollLeft = scrollStart.x - dx;
-    elements.imageContainer.scrollTop = scrollStart.y - dy;
+    // 计算新的滚动位置
+    let newScrollLeft = scrollStart.x - dx;
+    let newScrollTop = scrollStart.y - dy;
+    
+    // 限制滚动范围，确保图片至少有一部分可见
+    const container = elements.imageContainer;
+    const maxScrollLeft = container.scrollWidth - container.clientWidth;
+    const maxScrollTop = container.scrollHeight - container.clientHeight;
+    
+    // 边界限制
+    newScrollLeft = Math.max(0, Math.min(newScrollLeft, maxScrollLeft));
+    newScrollTop = Math.max(0, Math.min(newScrollTop, maxScrollTop));
+    
+    elements.imageContainer.scrollLeft = newScrollLeft;
+    elements.imageContainer.scrollTop = newScrollTop;
 }
 
 // 容器鼠标抬起（拖动）
