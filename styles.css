@@ -486,7 +486,7 @@ body {
 .sidebar-right {
     width: 320px;
     min-width: 250px;
-    max-width: 600px;
+    max-width: 70vw;
     background: #ffffff;
     border-left: 1px solid #e4e7ed;
     display: flex;
@@ -698,7 +698,6 @@ body {
     flex: 3;
     display: flex;
     flex-direction: column;
-    border-bottom: 1px solid #e4e7ed;
     overflow: hidden;
 }
 
@@ -799,6 +798,24 @@ body {
 
 .tree-node.expanded > .tree-children {
     display: block;
+}
+
+/* 节点分隔条 */
+.node-resizer {
+    height: 5px;
+    background: #e4e7ed;
+    cursor: row-resize;
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+    position: relative;
+}
+
+.node-resizer:hover {
+    background: #409EFF;
+}
+
+.node-resizer:active {
+    background: #3a8ee6;
 }
 
 /* 节点详情容器 */
@@ -1355,5 +1372,139 @@ body {
 .color-history-list::-webkit-scrollbar-thumb:hover,
 .area-colors::-webkit-scrollbar-thumb:hover {
     background: #c0c4cc;
+}
+
+/* 取色历史Tab切换 */
+.color-history-tabs {
+    display: flex;
+    background: #fafafa;
+    border-bottom: 1px solid #e4e7ed;
+    padding: 0 10px;
+}
+
+.color-tab-btn {
+    flex: 1;
+    padding: 10px 15px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #606266;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border-bottom: 2px solid transparent;
+}
+
+.color-tab-btn:hover {
+    color: #409EFF;
+    background: rgba(64, 158, 255, 0.05);
+}
+
+.color-tab-btn.active {
+    color: #409EFF;
+    border-bottom-color: #409EFF;
+    background: rgba(64, 158, 255, 0.1);
+}
+
+/* 取色历史容器 */
+#single-color-container,
+#multi-color-container {
+    flex-direction: column;
+}
+
+/* 序号显示 */
+.color-number {
+    background: #409EFF;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+/* 多点取色记录选中状态 */
+.area-item.selected {
+    background: #ecf5ff;
+    border-color: #409EFF;
+    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+.area-item {
+    cursor: pointer;
+}
+
+.area-item:hover {
+    background: #f5f7fa;
+    border-color: #c6e2ff;
+}
+
+.area-item.selected:hover {
+    background: #e1f0ff;
+}
+
+/* 多点找色代码显示区域 */
+.multi-color-code-container {
+    background: #fafafa;
+    border-top: 1px solid #e4e7ed;
+    padding: 15px;
+    max-height: 250px;
+    display: flex;
+    flex-direction: column;
+}
+
+.code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.code-header h4 {
+    font-size: 0.95rem;
+    color: #303133;
+    margin: 0;
+    font-weight: 600;
+}
+
+.multi-color-code {
+    flex: 1;
+    background: #2d2d2d;
+    color: #f8f8f2;
+    padding: 12px;
+    border-radius: 6px;
+    font-family: 'Courier New', Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    overflow: auto;
+    margin: 0;
+    white-space: pre;
+    border: 1px solid #e4e7ed;
+}
+
+.multi-color-code code {
+    color: #f8f8f2;
+}
+
+.multi-color-code::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.multi-color-code::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+.multi-color-code::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 3px;
+}
+
+.multi-color-code::-webkit-scrollbar-thumb:hover {
+    background: #777;
 }
 

@@ -77,7 +77,7 @@ function createWindow() {
   });
 
   // 打开开发者工具（开发时使用）
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 
   mainWindow.on('closed', () => {
     mainWindow = null;

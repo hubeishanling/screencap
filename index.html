@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:">
-    <title>ADB 截图工具</title>
+    <title>RichAuto图色工具</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
     <header class="top-bar">
         <div class="header-content">
             <div class="header-left">
-                <h1> ADB 截图工具</h1>
+                <h1>RichAuto图色工具</h1>
                 <div class="platform-info">
                     <span class="platform-brand">richauto脚本免费开发平台</span>
                     <span class="platform-divider">|</span>
@@ -140,6 +140,8 @@
                         <p class="empty-state">请点击"抓取节点"按钮获取UI层级信息</p>
                     </div>
                 </div>
+                <!-- 节点树与详情之间的拖动分隔条 -->
+                <div class="node-resizer" id="node-resizer"></div>
                 <div class="node-details-container">
                     <h3>节点详情</h3>
                     <div id="node-details" class="node-details">
@@ -168,10 +170,32 @@
                         <button id="recolor-area-btn" class="btn btn-block btn-success" disabled>重新取色</button>
                     </div>
                 </div>
-                <div class="color-history-container">
-                    <h3>取色记录</h3>
-                    <div id="color-history-list" class="color-history-list">
-                        <p class="empty-state">暂无取色记录<br>点击顶部"取色模式"按钮开始</p>
+                
+                <!-- 取色记录的tab切换 -->
+                <div class="color-history-tabs">
+                    <button id="single-color-tab-btn" class="color-tab-btn active">单点取色</button>
+                    <button id="multi-color-tab-btn" class="color-tab-btn">多点取色</button>
+                </div>
+                
+                <!-- 单点取色历史容器 -->
+                <div class="color-history-container" id="single-color-container" style="display: flex;">
+                    <div id="single-color-history-list" class="color-history-list">
+                        <p class="empty-state">暂无单点取色记录<br>选择"单点取色"模式开始</p>
+                    </div>
+                </div>
+                
+                <!-- 多点取色历史容器 -->
+                <div class="color-history-container" id="multi-color-container" style="display: none;">
+                    <div id="multi-color-history-list" class="color-history-list">
+                        <p class="empty-state">暂无多点取色记录<br>选择"范围取色"模式开始</p>
+                    </div>
+                    <!-- 多点找色代码显示区域 -->
+                    <div class="multi-color-code-container">
+                        <div class="code-header">
+                            <h4>多点找色代码</h4>
+                            <button id="copy-multi-code-btn" class="btn btn-tiny btn-primary" disabled>复制代码</button>
+                        </div>
+                        <pre id="multi-color-code" class="multi-color-code"><code>// 选择一条多点取色记录以生成代码</code></pre>
                     </div>
                 </div>
             </div>

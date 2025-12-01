@@ -66,7 +66,8 @@ class UIManager {
         const newWidth = windowWidth - mouseX - 5;
         
         const minWidth = 250;
-        const maxWidth = 600;
+        // 最大宽度为窗口宽度的70%，或者至少留400px给中间的截图区域
+        const maxWidth = Math.max(windowWidth * 0.7, windowWidth - 400);
         const finalWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
         
         this.elements.sidebarRight.style.width = finalWidth + 'px';

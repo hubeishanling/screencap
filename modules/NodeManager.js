@@ -4,11 +4,16 @@ class NodeManager {
         this.uiHierarchyData = null;
         this.selectedNode = null;
         this.elements = {};
+        this.isResizingNodes = false;
     }
 
     // 初始化元素引用
     initElements(elements) {
         this.elements = elements;
+        // 添加节点分隔条元素引用
+        this.elements.nodeResizer = document.getElementById('node-resizer');
+        this.elements.nodesTreeContainer = document.querySelector('.nodes-tree-container');
+        this.elements.nodeDetailsContainer = document.querySelector('.node-details-container');
     }
 
     // 设置事件监听器
@@ -16,6 +21,11 @@ class NodeManager {
         this.elements.nodeSearch.addEventListener('input', this.onNodeSearch.bind(this));
         this.elements.expandAllBtn.addEventListener('click', this.expandAllNodes.bind(this));
         this.elements.collapseAllBtn.addEventListener('click', this.collapseAllNodes.bind(this));
+        
+        // 节点分隔条拖动
+        if (this.elements.nodeResizer) {
+            this.elements.nodeResizer.addEventListener('mousedown', this.startNodeResize.bind(this));
+        }
     }
 
     // 抓取UI层级结构
@@ -245,11 +255,14 @@ class NodeManager {
         
         let html = '<div class="node-details-content">';
         
-        html += `<div class="detail-item"><strong>标签:</strong> <span>${node.tag}</span></div>`;
+        html += `<div class="detail-item"><strong>tag:</strong> <span>${node.tag}</span></div>`;
         
-        const importantAttrs = ['resource-id', 'class', 'package', 'text', 'content-desc', 
-                                'checkable', 'checked', 'clickable', 'enabled', 'focusable', 
-                                'focused', 'scrollable', 'long-clickable', 'password', 'selected', 'bounds'];
+        // Android UI Automator 标准属性（按 uiautomator dump 输出顺序）
+        const importantAttrs = [
+            'index', 'text', 'resource-id', 'class', 'package', 'content-desc',
+            'checkable', 'checked', 'clickable', 'enabled', 'focusable', 'focused', 
+            'scrollable', 'long-clickable', 'password', 'selected', 'bounds'
+        ];
         
         for (const attr of importantAttrs) {
             if (node.attributes[attr] !== undefined) {
@@ -261,13 +274,14 @@ class NodeManager {
             }
         }
         
+        // 显示其他所有未列出的属性
         for (const attr in node.attributes) {
             if (!importantAttrs.includes(attr)) {
                 html += `<div class="detail-item"><strong>${attr}:</strong> <span>${node.attributes[attr]}</span></div>`;
             }
         }
         
-        html += `<div class="detail-item"><strong>子节点数:</strong> <span>${node.children.length}</span></div>`;
+        html += `<div class="detail-item"><strong>children-count:</strong> <span>${node.children.length}</span></div>`;
         html += '</div>';
         
         this.elements.nodeDetails.innerHTML = html;
@@ -562,6 +576,58 @@ class NodeManager {
             result += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         return result;
+    }
+
+    // 开始拖动调整节点树和详情的大小
+    startNodeResize(e) {
+        this.isResizingNodes = true;
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        
+        document.addEventListener('mousemove', this.doNodeResize.bind(this));
+        document.addEventListener('mouseup', this.stopNodeResize.bind(this));
+        
+        e.preventDefault();
+    }
+
+    // 执行调整大小
+    doNodeResize(e) {
+        if (!this.isResizingNodes) return;
+        
+        const nodesPanel = this.elements.nodesPanel;
+        if (!nodesPanel) return;
+        
+        const panelRect = nodesPanel.getBoundingClientRect();
+        const mouseY = e.clientY;
+        const relativeY = mouseY - panelRect.top;
+        
+        // 计算新的flex值比例
+        const totalHeight = panelRect.height;
+        const treeHeight = relativeY - 5; // 减去分隔条高度的一半
+        const detailsHeight = totalHeight - relativeY - 5;
+        
+        // 设置最小高度限制
+        const minHeight = 150;
+        if (treeHeight < minHeight || detailsHeight < minHeight) {
+            return;
+        }
+        
+        // 计算flex比例
+        const treeFlex = treeHeight / totalHeight * 5; // 5是总flex（原来是3+2）
+        const detailsFlex = detailsHeight / totalHeight * 5;
+        
+        this.elements.nodesTreeContainer.style.flex = treeFlex;
+        this.elements.nodeDetailsContainer.style.flex = detailsFlex;
+    }
+
+    // 停止拖动调整大小
+    stopNodeResize() {
+        this.isResizingNodes = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        
+        document.removeEventListener('mousemove', this.doNodeResize.bind(this));
+        document.removeEventListener('mouseup', this.stopNodeResize.bind(this));
     }
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "screencap-electron-app",
-  "version": "1.0.0",
-  "description": "ADB 截图工具",
+  "version": "1.0.1",
+  "description": "RichAuto图色工具",
   "main": "main.js",
   "author": "Your Name",
   "scripts": {
@@ -27,7 +27,7 @@
   },
   "build": {
     "appId": "com.screencap.app",
-    "productName": "ADB截图工具",
+    "productName": "RichAuto图色工具",
     "asar": false,
     "electronDownload": {
       "mirror": "https://npmmirror.com/mirrors/electron/"

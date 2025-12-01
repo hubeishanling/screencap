@@ -90,11 +90,20 @@ function initializeApp() {
         gridSizeControl: document.getElementById('grid-size-control'),
         clearColorHistoryBtn: document.getElementById('clear-color-history-btn'),
         recolorAreaBtn: document.getElementById('recolor-area-btn'),
-        colorHistoryList: document.getElementById('color-history-list'),
         colorPreview: document.getElementById('color-preview'),
         colorPreviewSwatch: document.getElementById('color-preview-swatch'),
         colorPreviewHex: document.getElementById('color-preview-hex'),
-        colorPreviewRgb: document.getElementById('color-preview-rgb')
+        colorPreviewRgb: document.getElementById('color-preview-rgb'),
+        
+        // 取色历史Tab
+        singleColorTabBtn: document.getElementById('single-color-tab-btn'),
+        multiColorTabBtn: document.getElementById('multi-color-tab-btn'),
+        singleColorContainer: document.getElementById('single-color-container'),
+        multiColorContainer: document.getElementById('multi-color-container'),
+        singleColorHistoryList: document.getElementById('single-color-history-list'),
+        multiColorHistoryList: document.getElementById('multi-color-history-list'),
+        multiColorCode: document.getElementById('multi-color-code'),
+        copyMultiCodeBtn: document.getElementById('copy-multi-code-btn')
     };
     
     // 初始化各个模块

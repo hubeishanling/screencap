@@ -4,11 +4,14 @@ class ColorPickerManager {
         this.elements = {};
         this.isColorPickMode = false;
         this.colorPickType = 'single'; // 'single' or 'area'
-        this.colorHistory = [];
+        this.singleColorHistory = []; // 单点取色历史
+        this.multiColorHistory = []; // 多点取色历史
         this.maxHistory = 50;
         this.areaColorPoints = [];
         this.pointCount = 25; // 范围取色的点数
         this.lastAreaData = null; // 保存最后一次框选的区域数据
+        this.currentTab = 'single'; // 当前显示的tab
+        this.selectedMultiColorIndex = -1; // 当前选中的多点取色记录索引
     }
 
     // 初始化元素引用
@@ -37,19 +40,37 @@ class ColorPickerManager {
         // 重新取色按钮
         this.elements.recolorAreaBtn.addEventListener('click', () => this.recolorLastArea());
         
-        // 复制颜色值和删除
-        this.elements.colorHistoryList.addEventListener('click', (e) => {
+        // Tab切换
+        this.elements.singleColorTabBtn.addEventListener('click', () => this.switchTab('single'));
+        this.elements.multiColorTabBtn.addEventListener('click', () => this.switchTab('multi'));
+        
+        // 单点取色历史列表事件
+        this.elements.singleColorHistoryList.addEventListener('click', (e) => {
             if (e.target.closest('.copy-color-btn')) {
                 const colorValue = e.target.closest('.copy-color-btn').dataset.color;
                 this.copyToClipboard(colorValue, false);
-            } else if (e.target.closest('.copy-all-btn')) {
+            } else if (e.target.closest('.delete-color-btn')) {
+                const index = parseInt(e.target.closest('.delete-color-btn').dataset.index);
+                this.deleteColorItem(index, 'single');
+            }
+        });
+        
+        // 多点取色历史列表事件
+        this.elements.multiColorHistoryList.addEventListener('click', (e) => {
+            if (e.target.closest('.copy-all-btn')) {
                 const index = parseInt(e.target.closest('.copy-all-btn').dataset.index);
                 this.copyAllColors(index);
             } else if (e.target.closest('.delete-color-btn')) {
                 const index = parseInt(e.target.closest('.delete-color-btn').dataset.index);
-                this.deleteColorItem(index);
+                this.deleteColorItem(index, 'multi');
+            } else if (e.target.closest('.area-item')) {
+                const index = parseInt(e.target.closest('.area-item').dataset.index);
+                this.selectMultiColorRecord(index);
             }
         });
+        
+        // 复制多点找色代码
+        this.elements.copyMultiCodeBtn.addEventListener('click', () => this.copyMultiColorCode());
     }
 
     // 切换取色模式
@@ -149,7 +170,7 @@ class ColorPickerManager {
             const originalX = Math.round(x / scaleInfo.totalScale);
             const originalY = Math.round(y / scaleInfo.totalScale);
             
-            this.addColorToHistory({
+            this.singleColorHistory.unshift({
                 type: 'single',
                 x: originalX,
                 y: originalY,
@@ -157,6 +178,12 @@ class ColorPickerManager {
                 timestamp: new Date().toLocaleString()
             });
             
+            // 限制历史记录数量
+            if (this.singleColorHistory.length > this.maxHistory) {
+                this.singleColorHistory = this.singleColorHistory.slice(0, this.maxHistory);
+            }
+            
+            this.updateColorHistoryUI();
             window.showStatus(`取色成功: ${color.hex} (${originalX}, ${originalY})`, 'success');
         }
     }
@@ -231,16 +258,22 @@ class ColorPickerManager {
                 
                 if (existingIndex !== -1) {
                     // 找到相同区域的记录，替换它
-                    this.colorHistory[existingIndex] = newRecord;
+                    this.multiColorHistory[existingIndex] = newRecord;
                     window.showStatus(`重新取色成功: ${colors.length} 个采样点（已更新）`, 'success');
                 } else {
                     // 没有找到相同区域的记录，添加新记录
-                    this.addColorToHistory(newRecord);
+                    this.multiColorHistory.unshift(newRecord);
+                    if (this.multiColorHistory.length > this.maxHistory) {
+                        this.multiColorHistory = this.multiColorHistory.slice(0, this.maxHistory);
+                    }
                     window.showStatus(`范围取色成功: ${colors.length} 个采样点（新增）`, 'success');
                 }
             } else {
                 // 正常的范围取色，添加新记录
-                this.addColorToHistory(newRecord);
+                this.multiColorHistory.unshift(newRecord);
+                if (this.multiColorHistory.length > this.maxHistory) {
+                    this.multiColorHistory = this.multiColorHistory.slice(0, this.maxHistory);
+                }
                 window.showStatus(`范围取色成功: ${colors.length} 个采样点`, 'success');
             }
             
@@ -250,8 +283,8 @@ class ColorPickerManager {
     
     // 查找相同区域的记录
     findSameAreaRecord(areaData) {
-        for (let i = 0; i < this.colorHistory.length; i++) {
-            const item = this.colorHistory[i];
+        for (let i = 0; i < this.multiColorHistory.length; i++) {
+            const item = this.multiColorHistory[i];
             if (item.type === 'area') {
                 // 判断区域是否相同（坐标和尺寸都相同）
                 if (item.area.x === areaData.x &&
@@ -353,31 +386,37 @@ class ColorPickerManager {
         this.elements.colorPreviewRgb.textContent = `(${originalX}, ${originalY})`;
     }
 
-    // 添加到取色历史
-    addColorToHistory(item) {
-        this.colorHistory.unshift(item);
+    // Tab切换
+    switchTab(tab) {
+        this.currentTab = tab;
         
-        // 限制历史记录数量
-        if (this.colorHistory.length > this.maxHistory) {
-            this.colorHistory = this.colorHistory.slice(0, this.maxHistory);
+        // 更新tab按钮状态
+        if (tab === 'single') {
+            this.elements.singleColorTabBtn.classList.add('active');
+            this.elements.multiColorTabBtn.classList.remove('active');
+            this.elements.singleColorContainer.style.display = 'flex';
+            this.elements.multiColorContainer.style.display = 'none';
+        } else {
+            this.elements.singleColorTabBtn.classList.remove('active');
+            this.elements.multiColorTabBtn.classList.add('active');
+            this.elements.singleColorContainer.style.display = 'none';
+            this.elements.multiColorContainer.style.display = 'flex';
         }
-        
-        this.updateColorHistoryUI();
     }
 
     // 更新取色历史UI
     updateColorHistoryUI() {
-        if (this.colorHistory.length === 0) {
-            this.elements.colorHistoryList.innerHTML = '<p class="empty-state">暂无取色记录</p>';
-            return;
-        }
-        
-        let html = '';
-        this.colorHistory.forEach((item, index) => {
-            if (item.type === 'single') {
+        // 更新单点取色列表
+        if (this.singleColorHistory.length === 0) {
+            this.elements.singleColorHistoryList.innerHTML = '<p class="empty-state">暂无单点取色记录<br>选择"单点取色"模式开始</p>';
+        } else {
+            let html = '';
+            this.singleColorHistory.forEach((item, index) => {
+                const number = this.singleColorHistory.length - index; // 从后往前编号
                 const copyData = `${item.x}|${item.y}|${item.color.hex}`;
                 html += `
                     <div class="color-history-item">
+                        <div class="color-number">${number}</div>
                         <div class="color-swatch" style="background-color: ${item.color.hex}"></div>
                         <div class="color-info">
                             <div class="color-value">
@@ -391,11 +430,23 @@ class ColorPickerManager {
                         </div>
                     </div>
                 `;
-            } else {
+            });
+            this.elements.singleColorHistoryList.innerHTML = html;
+        }
+        
+        // 更新多点取色列表
+        if (this.multiColorHistory.length === 0) {
+            this.elements.multiColorHistoryList.innerHTML = '<p class="empty-state">暂无多点取色记录<br>选择"范围取色"模式开始</p>';
+        } else {
+            let html = '';
+            this.multiColorHistory.forEach((item, index) => {
+                const number = this.multiColorHistory.length - index; // 从后往前编号
+                const isSelected = index === this.selectedMultiColorIndex;
                 html += `
-                    <div class="color-history-item area-item">
+                    <div class="color-history-item area-item ${isSelected ? 'selected' : ''}" data-index="${index}">
                         <div class="area-header">
                             <div class="area-header-left">
+                                <span class="color-number">${number}</span>
                                 <strong>范围取色</strong>
                                 <span class="area-badge">${item.colors.length} 点</span>
                             </div>
@@ -417,7 +468,7 @@ class ColorPickerManager {
                             </div>
                         </div>
                         <div class="area-colors">
-                            ${item.colors.map(c => {
+                            ${item.colors.slice(0, 5).map(c => {
                                 const copyData = `${c.x}|${c.y}|${c.color.hex}`;
                                 return `
                                     <div class="area-color-item">
@@ -430,65 +481,71 @@ class ColorPickerManager {
                                     </div>
                                 `;
                             }).join('')}
+                            ${item.colors.length > 5 ? `<div class="more-colors">还有 ${item.colors.length - 5} 个采样点...</div>` : ''}
                         </div>
                     </div>
                 `;
-            }
-        });
-        
-        this.elements.colorHistoryList.innerHTML = html;
+            });
+            this.elements.multiColorHistoryList.innerHTML = html;
+        }
     }
 
     // 清空取色历史
     clearColorHistory() {
-        if (this.colorHistory.length === 0) return;
-        
-        if (confirm('确定要清空所有取色记录吗？')) {
-            this.colorHistory = [];
-            this.updateColorHistoryUI();
-            window.showStatus('取色记录已清空', 'info');
+        if (this.currentTab === 'single') {
+            if (this.singleColorHistory.length === 0) return;
+            if (confirm('确定要清空所有单点取色记录吗？')) {
+                this.singleColorHistory = [];
+                this.updateColorHistoryUI();
+                window.showStatus('单点取色记录已清空', 'info');
+            }
+        } else {
+            if (this.multiColorHistory.length === 0) return;
+            if (confirm('确定要清空所有多点取色记录吗？')) {
+                this.multiColorHistory = [];
+                this.selectedMultiColorIndex = -1;
+                this.updateColorHistoryUI();
+                this.updateMultiColorCode();
+                window.showStatus('多点取色记录已清空', 'info');
+            }
         }
     }
 
     // 导出取色数据
     async exportColorData() {
-        if (this.colorHistory.length === 0) {
+        const totalItems = this.singleColorHistory.length + this.multiColorHistory.length;
+        if (totalItems === 0) {
             window.showStatus('没有可导出的取色数据', 'warning');
             return;
         }
         
         const data = {
             exportTime: new Date().toLocaleString(),
-            totalItems: this.colorHistory.length,
-            items: this.colorHistory.map(item => {
-                if (item.type === 'single') {
-                    return {
-                        type: 'single',
-                        position: { x: item.x, y: item.y },
-                        color: {
-                            hex: item.color.hex,
-                            rgb: item.color.rgb,
-                            rgba: item.color.rgba
-                        },
-                        timestamp: item.timestamp
-                    };
-                } else {
-                    return {
-                        type: 'area',
-                        area: item.area,
-                        pointCount: item.pointCount || item.colors.length,
-                        colors: item.colors.map(c => ({
-                            position: { x: c.x, y: c.y },
-                            color: {
-                                hex: c.color.hex,
-                                rgb: c.color.rgb,
-                                rgba: c.color.rgba
-                            }
-                        })),
-                        timestamp: item.timestamp
-                    };
-                }
-            })
+            totalItems: totalItems,
+            singleColorItems: this.singleColorHistory.map(item => ({
+                type: 'single',
+                position: { x: item.x, y: item.y },
+                color: {
+                    hex: item.color.hex,
+                    rgb: item.color.rgb,
+                    rgba: item.color.rgba
+                },
+                timestamp: item.timestamp
+            })),
+            multiColorItems: this.multiColorHistory.map(item => ({
+                type: 'area',
+                area: item.area,
+                pointCount: item.pointCount || item.colors.length,
+                colors: item.colors.map(c => ({
+                    position: { x: c.x, y: c.y },
+                    color: {
+                        hex: c.color.hex,
+                        rgb: c.color.rgb,
+                        rgba: c.color.rgba
+                    }
+                })),
+                timestamp: item.timestamp
+            }))
         };
         
         try {
@@ -514,11 +571,89 @@ class ColorPickerManager {
         }
     }
 
+    // 选中多点取色记录
+    selectMultiColorRecord(index) {
+        if (index < 0 || index >= this.multiColorHistory.length) return;
+        
+        this.selectedMultiColorIndex = index;
+        this.updateColorHistoryUI();
+        this.updateMultiColorCode();
+    }
+    
+    // 生成多点找色代码
+    generateMultiColorCode(item) {
+        if (!item || item.colors.length === 0) {
+            return '// 选择一条多点取色记录以生成代码';
+        }
+        
+        // 第一个点作为主颜色和基准点
+        const firstPoint = item.colors[0];
+        const firstColor = firstPoint.color.hex;
+        const baseX = firstPoint.x;
+        const baseY = firstPoint.y;
+        
+        // 其他点相对于第一个点的坐标
+        const relativePoints = item.colors.slice(1).map(c => {
+            const relX = c.x - baseX;
+            const relY = c.y - baseY;
+            return `    [${relX}, ${relY}, "${c.color.hex}"]`;
+        });
+        
+        // 生成代码
+        const code = `let point = findMultiColors(img, "${firstColor}", [
+${relativePoints.join(',\n')}
+], {
+    region: [${item.area.x}, ${item.area.y}, ${item.area.width}, ${item.area.height}],
+    threshold: 15
+});`;
+        
+        return code;
+    }
+    
+    // 更新多点找色代码显示
+    updateMultiColorCode() {
+        if (this.selectedMultiColorIndex === -1 || this.selectedMultiColorIndex >= this.multiColorHistory.length) {
+            this.elements.multiColorCode.innerHTML = '<code>// 选择一条多点取色记录以生成代码</code>';
+            this.elements.copyMultiCodeBtn.disabled = true;
+            return;
+        }
+        
+        const item = this.multiColorHistory[this.selectedMultiColorIndex];
+        const code = this.generateMultiColorCode(item);
+        this.elements.multiColorCode.innerHTML = `<code>${this.escapeHtml(code)}</code>`;
+        this.elements.copyMultiCodeBtn.disabled = false;
+    }
+    
+    // 复制多点找色代码
+    copyMultiColorCode() {
+        if (this.selectedMultiColorIndex === -1 || this.selectedMultiColorIndex >= this.multiColorHistory.length) {
+            window.showStatus('请先选择一条多点取色记录', 'warning');
+            return;
+        }
+        
+        const item = this.multiColorHistory[this.selectedMultiColorIndex];
+        const code = this.generateMultiColorCode(item);
+        this.copyToClipboard(code, false);
+        window.showStatus('多点找色代码已复制', 'success');
+    }
+    
+    // HTML转义
+    escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+    
     // 复制所有颜色点
     copyAllColors(index) {
-        if (index < 0 || index >= this.colorHistory.length) return;
+        if (index < 0 || index >= this.multiColorHistory.length) return;
         
-        const item = this.colorHistory[index];
+        const item = this.multiColorHistory[index];
         if (item.type !== 'area') return;
         
         // 生成复制格式：每个点用引号包裹，用逗号分隔
@@ -528,16 +663,30 @@ class ColorPickerManager {
     }
 
     // 删除单条取色记录
-    deleteColorItem(index) {
-        if (index < 0 || index >= this.colorHistory.length) return;
-        
-        const item = this.colorHistory[index];
-        const typeText = item.type === 'single' ? '单点取色记录' : '范围取色记录';
-        
-        if (confirm(`确定要删除这条${typeText}吗？`)) {
-            this.colorHistory.splice(index, 1);
-            this.updateColorHistoryUI();
-            window.showStatus('取色记录已删除', 'success');
+    deleteColorItem(index, type) {
+        if (type === 'single') {
+            if (index < 0 || index >= this.singleColorHistory.length) return;
+            
+            if (confirm('确定要删除这条单点取色记录吗？')) {
+                this.singleColorHistory.splice(index, 1);
+                this.updateColorHistoryUI();
+                window.showStatus('单点取色记录已删除', 'success');
+            }
+        } else {
+            if (index < 0 || index >= this.multiColorHistory.length) return;
+            
+            if (confirm('确定要删除这条多点取色记录吗？')) {
+                this.multiColorHistory.splice(index, 1);
+                // 如果删除的是当前选中的，重置选中状态
+                if (index === this.selectedMultiColorIndex) {
+                    this.selectedMultiColorIndex = -1;
+                } else if (index < this.selectedMultiColorIndex) {
+                    this.selectedMultiColorIndex--;
+                }
+                this.updateColorHistoryUI();
+                this.updateMultiColorCode();
+                window.showStatus('多点取色记录已删除', 'success');
+            }
         }
     }
 
