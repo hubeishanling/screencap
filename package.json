@@ -1,6 +1,6 @@
 {
   "name": "screencap-electron-app",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "RichAuto图色工具",
   "main": "main.js",
   "author": "Your Name",

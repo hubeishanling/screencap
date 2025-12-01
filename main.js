@@ -208,6 +208,256 @@ ipcMain.handle('check-adb-devices', async () => {
   }
 });
 
+// 扫描网络和USB设备
+ipcMain.handle('scan-all-devices', async () => {
+  try {
+    const allDevices = [];
+    
+    // 1. 扫描USB设备
+    try {
+      const usbOutput = execSync(`"${adbPath}" devices`, { encoding: 'utf-8' });
+      const usbLines = usbOutput.split('\n').filter(line => line.trim() && !line.includes('List of devices'));
+      
+      const usbDevices = usbLines.map(line => {
+        const parts = line.trim().split(/\s+/);
+        return {
+          id: parts[0],
+          status: parts[1] || 'unknown',
+          type: 'USB',
+          displayName: `${parts[0]} (USB)`
+        };
+      }).filter(device => device.status === 'device');
+      
+      allDevices.push(...usbDevices);
+    } catch (err) {
+      console.error('USB设备扫描失败:', err);
+    }
+    
+    // 2. 扫描局域网中的 AutoJs6 设备（HTTP 发现）
+    try {
+      const networkDevices = await scanNetworkDevices();
+      allDevices.push(...networkDevices);
+    } catch (err) {
+      console.error('网络设备扫描失败:', err);
+    }
+    
+    // 3. 扫描WiFi设备（使用 adb mdns services）
+    try {
+      const mdnsOutput = execSync(`"${adbPath}" mdns services`, { 
+        encoding: 'utf-8',
+        timeout: 5000 
+      });
+      
+      const mdnsLines = mdnsOutput.split('\n').filter(line => line.trim());
+      
+      // 解析mdns输出，格式类似：
+      // adb-XXXXXX-YYYYYY._adb-tls-connect._tcp	192.168.1.100:5555
+      const wifiDevices = [];
+      for (const line of mdnsLines) {
+        const match = line.match(/adb-([^\s]+)\._adb[^\s]*\s+([0-9.]+):(\d+)/);
+        if (match) {
+          const deviceId = match[1];
+          const ip = match[2];
+          const port = match[3];
+          const address = `${ip}:${port}`;
+          
+          // 尝试连接该设备
+          try {
+            execSync(`"${adbPath}" connect ${address}`, { 
+              encoding: 'utf-8',
+              timeout: 3000 
+            });
+            
+            wifiDevices.push({
+              id: address,
+              status: 'device',
+              type: 'WiFi',
+              displayName: `${ip}:${port} (WiFi)`
+            });
+          } catch (connectErr) {
+            // 连接失败，跳过
+          }
+        }
+      }
+      
+      allDevices.push(...wifiDevices);
+    } catch (err) {
+      console.error('WiFi设备扫描失败:', err);
+    }
+    
+    // 去重（同一设备可能同时有USB和WiFi连接）
+    const uniqueDevices = [];
+    const deviceIds = new Set();
+    
+    for (const device of allDevices) {
+      if (!deviceIds.has(device.id)) {
+        deviceIds.add(device.id);
+        uniqueDevices.push(device);
+      }
+    }
+    
+    return { 
+      success: true, 
+      devices: uniqueDevices,
+      count: {
+        total: uniqueDevices.length,
+        usb: allDevices.filter(d => d.type === 'USB').length,
+        wifi: allDevices.filter(d => d.type === 'WiFi').length,
+        network: allDevices.filter(d => d.type === 'Network').length
+      }
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 扫描局域网中的 AutoJs6 设备
+async function scanNetworkDevices() {
+  const http = require('http');
+  const networkDevices = [];
+  
+  // 获取本机 IP 地址
+  const localIp = getLocalIpAddress();
+  if (!localIp) {
+    console.log('无法获取本机IP地址');
+    return networkDevices;
+  }
+  
+  // 提取网段 (例如: 192.168.1.x)
+  const ipParts = localIp.split('.');
+  if (ipParts.length !== 4) {
+    return networkDevices;
+  }
+  
+  const subnet = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
+  console.log(`扫描网段: ${subnet}.0/24`);
+  
+  // 并发扫描 IP 范围 (1-254)
+  const scanPromises = [];
+  const DISCOVERY_PORT = 9999;
+  const TIMEOUT = 1000; // 1秒超时
+  
+  for (let i = 1; i <= 254; i++) {
+    const ip = `${subnet}.${i}`;
+    
+    // 跳过本机 IP
+    if (ip === localIp) {
+      continue;
+    }
+    
+    const promise = new Promise((resolve) => {
+      const options = {
+        host: ip,
+        port: DISCOVERY_PORT,
+        path: '/',
+        method: 'GET',
+        timeout: TIMEOUT
+      };
+      
+      const req = http.request(options, (res) => {
+        let data = '';
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          try {
+            const deviceInfo = JSON.parse(data);
+            if (deviceInfo.type === 'autojs6') {
+              // 尝试通过 ADB 连接到该设备
+              const adbAddress = `${deviceInfo.ip}:${deviceInfo.adbPort || 5555}`;
+              
+              try {
+                execSync(`"${adbPath}" connect ${adbAddress}`, { 
+                  encoding: 'utf-8',
+                  timeout: 2000,
+                  stdio: 'ignore'
+                });
+                
+                resolve({
+                  id: adbAddress,
+                  status: 'device',
+                  type: 'Network',
+                  displayName: `${deviceInfo.deviceName || deviceInfo.deviceModel} (${deviceInfo.ip})`,
+                  deviceInfo: deviceInfo
+                });
+              } catch (connectErr) {
+                // 连接失败，但仍然记录设备
+                resolve({
+                  id: adbAddress,
+                  status: 'offline',
+                  type: 'Network',
+                  displayName: `${deviceInfo.deviceName || deviceInfo.deviceModel} (${deviceInfo.ip}) [未连接]`,
+                  deviceInfo: deviceInfo
+                });
+              }
+            } else {
+              resolve(null);
+            }
+          } catch (err) {
+            resolve(null);
+          }
+        });
+      });
+      
+      req.on('error', () => {
+        resolve(null);
+      });
+      
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(null);
+      });
+      
+      req.end();
+    });
+    
+    scanPromises.push(promise);
+  }
+  
+  // 等待所有扫描完成
+  const results = await Promise.all(scanPromises);
+  
+  // 过滤出有效设备
+  for (const device of results) {
+    if (device && device.status === 'device') {
+      networkDevices.push(device);
+    }
+  }
+  
+  console.log(`找到 ${networkDevices.length} 个网络设备`);
+  return networkDevices;
+}
+
+// 获取本机 IP 地址
+function getLocalIpAddress() {
+  const interfaces = os.networkInterfaces();
+  
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      // 跳过内部（即本地回环）和非 IPv4 地址
+      if (iface.family === 'IPv4' && !iface.internal) {
+        // 优先返回 192.168.x.x 的地址
+        if (iface.address.startsWith('192.168.')) {
+          return iface.address;
+        }
+      }
+    }
+  }
+  
+  // 如果没有 192.168.x.x，返回第一个有效的 IPv4 地址
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  
+  return null;
+}
+
 // ADB截图
 ipcMain.handle('capture-screen', async (event, deviceId) => {
   try {

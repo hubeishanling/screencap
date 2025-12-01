@@ -26,6 +26,7 @@ function initializeApp() {
         // 设备相关
         deviceSelect: document.getElementById('device-select'),
         refreshDevicesBtn: document.getElementById('refresh-devices-btn'),
+        scanDevicesBtn: document.getElementById('scan-devices-btn'),
         captureBtn: document.getElementById('capture-btn'),
         dumpUIBtn: document.getElementById('dump-ui-btn'),
         
@@ -121,6 +122,7 @@ function initializeApp() {
 function setupEventListeners() {
     // 设备管理
     elements.refreshDevicesBtn.addEventListener('click', () => window.DeviceManager.refreshDevices());
+    elements.scanDevicesBtn.addEventListener('click', () => window.DeviceManager.scanAllDevices());
     elements.deviceSelect.addEventListener('change', () => window.DeviceManager.onDeviceChange());
     
     // 截图相关
