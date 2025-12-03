@@ -208,6 +208,39 @@ ipcMain.handle('check-adb-devices', async () => {
   }
 });
 
+ipcMain.handle('connect-device', async (event, address) => {
+  try {
+    if (!address || typeof address !== 'string') {
+      return { success: false, error: '无效的地址' };
+    }
+    const output = execSync(`"${adbPath}" connect ${address}`, {
+      encoding: 'utf-8',
+      timeout: 5000
+    });
+    return { success: true, message: output.trim() };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('pair-device', async (event, address, code) => {
+  try {
+    if (!address || typeof address !== 'string' || !code || typeof code !== 'string') {
+      return { success: false, error: '参数无效' };
+    }
+    try {
+      execSync(`"${adbPath}" start-server`, { encoding: 'utf-8', timeout: 7000 });
+    } catch (_) {}
+    const output = execSync(`"${adbPath}" pair ${address} ${code}`, {
+      encoding: 'utf-8',
+      timeout: 15000
+    });
+    return { success: true, message: output.trim() };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 // 扫描网络和USB设备
 ipcMain.handle('scan-all-devices', async () => {
   try {

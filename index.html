@@ -30,6 +30,16 @@
                 </select>
                 <button id="refresh-devices-btn" class="btn btn-small btn-primary">刷新设备</button>
                 <button id="scan-devices-btn" class="btn btn-small btn-info">扫描网络设备</button>
+                <input id="manual-connect-input" type="text" placeholder="IP:端口">
+                <button id="manual-connect-btn" class="btn btn-small btn-secondary">手动连接</button>
+                <button id="adb-pair-btn" class="btn btn-small btn-secondary">ADB 配对</button>
+                <div id="adb-pair-form" style="display: none; margin-top: 6px;">
+                    <input id="pair-addr-input" type="text" placeholder="配对IP:端口">
+                    <input id="pair-code-input" type="text" placeholder="配对码">
+                    <input id="pair-debug-input" type="text" placeholder="调试IP:端口">
+                    <button id="pair-exec-btn" class="btn btn-small btn-secondary">执行配对并连接</button>
+                    <button id="pair-cancel-btn" class="btn btn-small btn-secondary">取消</button>
+                </div>
                 <button id="capture-btn" class="btn btn-small btn-success" disabled>截取屏幕</button>
                 <button id="dump-ui-btn" class="btn btn-small btn-info" disabled>抓取节点</button>
                 <button id="color-pick-btn" class="btn btn-small btn-secondary" disabled>取色模式</button>

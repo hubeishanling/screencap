@@ -27,6 +27,15 @@ function initializeApp() {
         deviceSelect: document.getElementById('device-select'),
         refreshDevicesBtn: document.getElementById('refresh-devices-btn'),
         scanDevicesBtn: document.getElementById('scan-devices-btn'),
+        manualConnectInput: document.getElementById('manual-connect-input'),
+        manualConnectBtn: document.getElementById('manual-connect-btn'),
+        adbPairBtn: document.getElementById('adb-pair-btn'),
+        adbPairForm: document.getElementById('adb-pair-form'),
+        pairAddrInput: document.getElementById('pair-addr-input'),
+        pairCodeInput: document.getElementById('pair-code-input'),
+        pairDebugInput: document.getElementById('pair-debug-input'),
+        pairExecBtn: document.getElementById('pair-exec-btn'),
+        pairCancelBtn: document.getElementById('pair-cancel-btn'),
         captureBtn: document.getElementById('capture-btn'),
         dumpUIBtn: document.getElementById('dump-ui-btn'),
         
@@ -124,6 +133,104 @@ function setupEventListeners() {
     elements.refreshDevicesBtn.addEventListener('click', () => window.DeviceManager.refreshDevices());
     elements.scanDevicesBtn.addEventListener('click', () => window.DeviceManager.scanAllDevices());
     elements.deviceSelect.addEventListener('change', () => window.DeviceManager.onDeviceChange());
+    elements.adbPairBtn.addEventListener('click', () => {
+        if (elements.adbPairForm.style.display === 'none') {
+            elements.adbPairForm.style.display = 'block';
+            window.showStatus('请输入配对信息并执行配对', 'info');
+        } else {
+            elements.adbPairForm.style.display = 'none';
+        }
+    });
+    elements.pairCancelBtn.addEventListener('click', () => {
+        elements.pairAddrInput.value = '';
+        elements.pairCodeInput.value = '';
+        elements.pairDebugInput.value = '';
+        elements.adbPairForm.style.display = 'none';
+    });
+    elements.pairExecBtn.addEventListener('click', async () => {
+        const addr = (elements.pairAddrInput.value || '').trim();
+        const code = (elements.pairCodeInput.value || '').trim();
+        const daddr = (elements.pairDebugInput.value || '').trim();
+        const addrRegex = /^(\d{1,3}\.){3}\d{1,3}:\d{1,5}$/;
+        if (!addrRegex.test(addr)) {
+            window.showStatus('配对地址格式不正确，应为 IP:端口', 'warning');
+            return;
+        }
+        if (!/^\d{6}$/.test(code)) {
+            window.showStatus('配对码应为6位数字', 'warning');
+            return;
+        }
+        if (!addrRegex.test(daddr)) {
+            window.showStatus('调试地址格式不正确，应为 IP:端口', 'warning');
+            return;
+        }
+        try {
+            elements.pairExecBtn.disabled = true;
+            window.showStatus(`正在配对 ${addr} ...`, 'info');
+            const pairResult = await window.electronAPI.pairDevice(addr, code);
+            if (!pairResult || !pairResult.success) {
+                const msg = (pairResult && (pairResult.message || pairResult.error)) || '配对失败';
+                window.showStatus(msg, 'error');
+                return;
+            }
+            window.showStatus('配对成功，正在连接...', 'success');
+            const conn = await window.electronAPI.connectDevice(daddr);
+            if (conn && conn.success) {
+                window.showStatus(conn.message || `已连接 ${daddr}`, 'success');
+                await window.DeviceManager.refreshDevices(true);
+                const options = Array.from(elements.deviceSelect.options);
+                const match = options.find(o => o.value === daddr);
+                if (match) {
+                    elements.deviceSelect.value = daddr;
+                    window.DeviceManager.onDeviceChange();
+                }
+                elements.adbPairForm.style.display = 'none';
+                elements.pairAddrInput.value = '';
+                elements.pairCodeInput.value = '';
+                elements.pairDebugInput.value = '';
+            } else {
+                const msg = (conn && (conn.message || conn.error)) || '连接失败';
+                window.showStatus(msg, 'error');
+            }
+        } catch (e) {
+            window.showStatus(`操作失败: ${e.message}`, 'error');
+        } finally {
+            elements.pairExecBtn.disabled = false;
+        }
+    });
+    elements.manualConnectBtn.addEventListener('click', async () => {
+        const address = (elements.manualConnectInput.value || '').trim();
+        if (!address) {
+            window.showStatus('请输入 IP:端口', 'warning');
+            return;
+        }
+        // 简单校验 IPv4:port
+        const ipv4PortRegex = /^\s*(\d{1,3}\.){3}\d{1,3}:\d{1,5}\s*$/;
+        if (!ipv4PortRegex.test(address)) {
+            window.showStatus('地址格式不正确，应为 IP:端口，例如 192.168.0.106:5555', 'warning');
+            return;
+        }
+        try {
+            window.showStatus(`正在连接 ${address} ...`, 'info');
+            const result = await window.electronAPI.connectDevice(address);
+            if (result && result.success) {
+                window.showStatus(result.message || `已连接 ${address}`, 'success');
+                await window.DeviceManager.refreshDevices(true);
+                // 自动选中该设备
+                const options = Array.from(elements.deviceSelect.options);
+                const match = options.find(o => o.value === address);
+                if (match) {
+                    elements.deviceSelect.value = address;
+                    window.DeviceManager.onDeviceChange();
+                }
+            } else {
+                const msg = (result && (result.message || result.error)) || '连接失败';
+                window.showStatus(msg, 'error');
+            }
+        } catch (err) {
+            window.showStatus(`连接出错: ${err.message}`, 'error');
+        }
+    });
     
     // 截图相关
     elements.captureBtn.addEventListener('click', () => window.ScreenshotManager.captureScreen());

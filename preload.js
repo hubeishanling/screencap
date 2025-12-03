@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ADB截图相关
   checkAdbDevices: () => ipcRenderer.invoke('check-adb-devices'),
   scanAllDevices: () => ipcRenderer.invoke('scan-all-devices'),
+  pairDevice: (address, code) => ipcRenderer.invoke('pair-device', address, code),
+  connectDevice: (address) => ipcRenderer.invoke('connect-device', address),
   captureScreen: (deviceId) => ipcRenderer.invoke('capture-screen', deviceId),
   
   // 图片裁剪和保存
