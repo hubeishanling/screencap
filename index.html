@@ -23,26 +23,68 @@
                     <span class="platform-qq">官方交流群: 726703994</span>
                 </div>
             </div>
-            <div class="device-selector">
-                <label for="device-select">选择设备：</label>
-                <select id="device-select" disabled>
-                    <option value="">请先刷新设备列表</option>
-                </select>
-                <button id="refresh-devices-btn" class="btn btn-small btn-primary">刷新设备</button>
-                <button id="scan-devices-btn" class="btn btn-small btn-info">扫描网络设备</button>
-                <input id="manual-connect-input" type="text" placeholder="IP:端口">
-                <button id="manual-connect-btn" class="btn btn-small btn-secondary">手动连接</button>
-                <button id="adb-pair-btn" class="btn btn-small btn-secondary">ADB 配对</button>
-                <div id="adb-pair-form" style="display: none; margin-top: 6px;">
-                    <input id="pair-addr-input" type="text" placeholder="配对IP:端口">
-                    <input id="pair-code-input" type="text" placeholder="配对码">
-                    <input id="pair-debug-input" type="text" placeholder="调试IP:端口">
-                    <button id="pair-exec-btn" class="btn btn-small btn-secondary">执行配对并连接</button>
-                    <button id="pair-cancel-btn" class="btn btn-small btn-secondary">取消</button>
+            <div class="device-connection-area">
+                <!-- 连接类型选择器 -->
+                <div class="connection-type-selector">
+                    <label>连接方式：</label>
+                    <div class="connection-type-buttons">
+                        <button id="conn-type-usb" class="conn-type-btn active" data-type="usb">USB连接</button>
+                        <button id="conn-type-wifi-new" class="conn-type-btn" data-type="wifi-new">Android 14+</button>
+                        <button id="conn-type-wifi-old" class="conn-type-btn" data-type="wifi-old">Android 11-13</button>
+                        <button id="conn-type-scan" class="conn-type-btn" data-type="scan">Android ≤10</button>
+                    </div>
                 </div>
-                <button id="capture-btn" class="btn btn-small btn-success" disabled>截取屏幕</button>
-                <button id="dump-ui-btn" class="btn btn-small btn-info" disabled>抓取节点</button>
-                <button id="color-pick-btn" class="btn btn-small btn-secondary" disabled>取色模式</button>
+
+                <!-- 连接配置区域 -->
+                <div class="connection-config-area">
+                    <!-- USB连接 -->
+                    <div id="conn-panel-usb" class="connection-panel active">
+                        <div class="connection-panel-content">
+                            <button id="refresh-devices-btn" class="btn btn-small btn-primary">刷新设备</button>
+                        </div>
+                    </div>
+
+                    <!-- Android 14+ 无线调试（ADB配对） -->
+                    <div id="conn-panel-wifi-new" class="connection-panel">
+                        <div class="connection-panel-content">
+                            <input id="pair-ip-input" type="text" placeholder="设备IP (例如：192.168.1.100)" class="form-input">
+                            <input id="pair-port-input" type="text" placeholder="配对端口" class="form-input-short">
+                            <input id="pair-code-input" type="text" placeholder="配对码" class="form-input-short">
+                            <input id="pair-debug-port-input" type="text" placeholder="调试端口" class="form-input-short">
+                            <button id="pair-exec-btn" class="btn btn-small btn-primary">执行配对并连接</button>
+                        </div>
+                    </div>
+
+                    <!-- Android 11-13 无线调试（手动连接） -->
+                    <div id="conn-panel-wifi-old" class="connection-panel">
+                        <div class="connection-panel-content">
+                            <input id="manual-connect-input" type="text" placeholder="设备地址 (例如：192.168.1.100:5555)" class="form-input">
+                            <button id="manual-connect-btn" class="btn btn-small btn-primary">连接设备</button>
+                        </div>
+                    </div>
+
+                    <!-- Android 10及以下（扫描网络） -->
+                    <div id="conn-panel-scan" class="connection-panel">
+                        <div class="connection-panel-content">
+                            <button id="scan-devices-btn" class="btn btn-small btn-primary">扫描网络设备</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 设备选择和操作区域 -->
+                <div class="device-operations-area">
+                    <div class="device-selector">
+                        <label for="device-select">已连接设备：</label>
+                        <select id="device-select" disabled>
+                            <option value="">请先连接设备</option>
+                        </select>
+                    </div>
+                    <div class="device-actions">
+                        <button id="capture-btn" class="btn btn-small btn-success" disabled>截取屏幕</button>
+                        <button id="dump-ui-btn" class="btn btn-small btn-info" disabled>抓取节点</button>
+                        <button id="color-pick-btn" class="btn btn-small btn-secondary" disabled>取色模式</button>
+                    </div>
+                </div>
             </div>
         </div>
     </header>

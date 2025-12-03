@@ -18,7 +18,7 @@ body {
 .top-bar {
     background: #ffffff;
     color: #303133;
-    padding: 15px 20px;
+    padding: 10px 20px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
     border-bottom: 1px solid #e4e7ed;
 }
@@ -80,29 +80,161 @@ body {
     font-weight: 500;
 }
 
-.device-selector {
+/* 设备连接区域 */
+.device-connection-area {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 1400px;
+}
+
+/* 连接类型选择器 */
+.connection-type-selector {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
+.connection-type-selector label {
+    font-weight: 500;
+    color: #606266;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.connection-type-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.conn-type-btn {
+    padding: 5px 12px;
+    background: #f5f7fa;
+    border: 1px solid #dcdfe6;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #606266;
+    white-space: nowrap;
+}
+
+.conn-type-btn:hover {
+    background: #ecf5ff;
+    border-color: #409EFF;
+    color: #409EFF;
+}
+
+.conn-type-btn.active {
+    background: #409EFF;
+    border-color: #409EFF;
+    color: white;
+}
+
+/* 连接配置区域 */
+.connection-config-area {
+    position: relative;
+    min-height: 36px;
+}
+
+.connection-panel {
+    display: none;
+}
+
+.connection-panel.active {
+    display: block;
+}
+
+.connection-panel-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.form-input {
+    padding: 5px 10px;
+    border: 1px solid #dcdfe6;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    background: white;
+    min-width: 200px;
+}
+
+.form-input-short {
+    padding: 5px 10px;
+    border: 1px solid #dcdfe6;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    background: white;
+    width: 100px;
+}
+
+.form-input:focus,
+.form-input-short:focus {
+    outline: none;
+    border-color: #409EFF;
+}
+
+.form-input::placeholder,
+.form-input-short::placeholder {
+    color: #c0c4cc;
+}
+
+/* 设备操作区域 */
+.device-operations-area {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.device-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 250px;
+}
+
 .device-selector label {
     font-weight: 500;
+    color: #606266;
+    white-space: nowrap;
 }
 
 .device-selector select {
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 0.95);
-    font-size: 0.95rem;
-    min-width: 200px;
+    flex: 1;
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid #dcdfe6;
+    background: white;
+    font-size: 0.85rem;
+    min-width: 150px;
     cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.device-selector select:focus {
+    outline: none;
+    border-color: #409EFF;
 }
 
 .device-selector select:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    background: #f5f7fa;
+}
+
+.device-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 /* 主工作区 */

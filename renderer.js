@@ -23,19 +23,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 function initializeApp() {
     // 缓存所有DOM元素
     elements = {
+        // 连接类型选择器
+        connTypeUsb: document.getElementById('conn-type-usb'),
+        connTypeWifiNew: document.getElementById('conn-type-wifi-new'),
+        connTypeWifiOld: document.getElementById('conn-type-wifi-old'),
+        connTypeScan: document.getElementById('conn-type-scan'),
+        connPanelUsb: document.getElementById('conn-panel-usb'),
+        connPanelWifiNew: document.getElementById('conn-panel-wifi-new'),
+        connPanelWifiOld: document.getElementById('conn-panel-wifi-old'),
+        connPanelScan: document.getElementById('conn-panel-scan'),
+        
         // 设备相关
         deviceSelect: document.getElementById('device-select'),
         refreshDevicesBtn: document.getElementById('refresh-devices-btn'),
         scanDevicesBtn: document.getElementById('scan-devices-btn'),
         manualConnectInput: document.getElementById('manual-connect-input'),
         manualConnectBtn: document.getElementById('manual-connect-btn'),
-        adbPairBtn: document.getElementById('adb-pair-btn'),
-        adbPairForm: document.getElementById('adb-pair-form'),
-        pairAddrInput: document.getElementById('pair-addr-input'),
+        pairIpInput: document.getElementById('pair-ip-input'),
+        pairPortInput: document.getElementById('pair-port-input'),
         pairCodeInput: document.getElementById('pair-code-input'),
-        pairDebugInput: document.getElementById('pair-debug-input'),
+        pairDebugPortInput: document.getElementById('pair-debug-port-input'),
         pairExecBtn: document.getElementById('pair-exec-btn'),
-        pairCancelBtn: document.getElementById('pair-cancel-btn'),
         captureBtn: document.getElementById('capture-btn'),
         dumpUIBtn: document.getElementById('dump-ui-btn'),
         
@@ -129,41 +137,44 @@ function initializeApp() {
 
 // 设置事件监听器
 function setupEventListeners() {
+    // 连接类型切换
+    setupConnectionTypeSwitcher();
+    
     // 设备管理
     elements.refreshDevicesBtn.addEventListener('click', () => window.DeviceManager.refreshDevices());
     elements.scanDevicesBtn.addEventListener('click', () => window.DeviceManager.scanAllDevices());
     elements.deviceSelect.addEventListener('change', () => window.DeviceManager.onDeviceChange());
-    elements.adbPairBtn.addEventListener('click', () => {
-        if (elements.adbPairForm.style.display === 'none') {
-            elements.adbPairForm.style.display = 'block';
-            window.showStatus('请输入配对信息并执行配对', 'info');
-        } else {
-            elements.adbPairForm.style.display = 'none';
-        }
-    });
-    elements.pairCancelBtn.addEventListener('click', () => {
-        elements.pairAddrInput.value = '';
-        elements.pairCodeInput.value = '';
-        elements.pairDebugInput.value = '';
-        elements.adbPairForm.style.display = 'none';
-    });
     elements.pairExecBtn.addEventListener('click', async () => {
-        const addr = (elements.pairAddrInput.value || '').trim();
+        const ip = (elements.pairIpInput.value || '').trim();
+        const pairPort = (elements.pairPortInput.value || '').trim();
         const code = (elements.pairCodeInput.value || '').trim();
-        const daddr = (elements.pairDebugInput.value || '').trim();
-        const addrRegex = /^(\d{1,3}\.){3}\d{1,3}:\d{1,5}$/;
-        if (!addrRegex.test(addr)) {
-            window.showStatus('配对地址格式不正确，应为 IP:端口', 'warning');
+        const debugPort = (elements.pairDebugPortInput.value || '').trim();
+        
+        // 验证IP地址
+        const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+        if (!ipRegex.test(ip)) {
+            window.showStatus('IP地址格式不正确', 'warning');
             return;
         }
+        // 验证端口
+        if (!/^\d{1,5}$/.test(pairPort) || parseInt(pairPort) > 65535) {
+            window.showStatus('配对端口格式不正确', 'warning');
+            return;
+        }
+        // 验证配对码
         if (!/^\d{6}$/.test(code)) {
             window.showStatus('配对码应为6位数字', 'warning');
             return;
         }
-        if (!addrRegex.test(daddr)) {
-            window.showStatus('调试地址格式不正确，应为 IP:端口', 'warning');
+        // 验证调试端口
+        if (!/^\d{1,5}$/.test(debugPort) || parseInt(debugPort) > 65535) {
+            window.showStatus('调试端口格式不正确', 'warning');
             return;
         }
+        
+        // 组合完整地址
+        const addr = `${ip}:${pairPort}`;
+        const daddr = `${ip}:${debugPort}`;
         try {
             elements.pairExecBtn.disabled = true;
             window.showStatus(`正在配对 ${addr} ...`, 'info');
@@ -184,10 +195,11 @@ function setupEventListeners() {
                     elements.deviceSelect.value = daddr;
                     window.DeviceManager.onDeviceChange();
                 }
-                elements.adbPairForm.style.display = 'none';
-                elements.pairAddrInput.value = '';
+                // 清空输入框
+                elements.pairIpInput.value = '';
+                elements.pairPortInput.value = '';
                 elements.pairCodeInput.value = '';
-                elements.pairDebugInput.value = '';
+                elements.pairDebugPortInput.value = '';
             } else {
                 const msg = (conn && (conn.message || conn.error)) || '连接失败';
                 window.showStatus(msg, 'error');
@@ -254,4 +266,28 @@ function setupEventListeners() {
     
     // UI管理器事件（在UIManager内部设置）
     window.UIManager.setupEventListeners();
+}
+
+// 连接类型切换器
+function setupConnectionTypeSwitcher() {
+    const typeButtons = [
+        { btn: elements.connTypeUsb, panel: elements.connPanelUsb },
+        { btn: elements.connTypeWifiNew, panel: elements.connPanelWifiNew },
+        { btn: elements.connTypeWifiOld, panel: elements.connPanelWifiOld },
+        { btn: elements.connTypeScan, panel: elements.connPanelScan }
+    ];
+    
+    typeButtons.forEach(({ btn, panel }) => {
+        btn.addEventListener('click', () => {
+            // 移除所有active类
+            typeButtons.forEach(({ btn: b, panel: p }) => {
+                b.classList.remove('active');
+                p.classList.remove('active');
+            });
+            
+            // 添加当前的active类
+            btn.classList.add('active');
+            panel.classList.add('active');
+        });
+    });
 }
